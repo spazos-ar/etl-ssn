@@ -16,7 +16,7 @@ def authenticate(config, debug_enabled):
     url = "https://testri.ssn.gob.ar/api/login"
     payload = {
         "USER": config["user"],
-        "CIA": config["cia"],
+        "CIA": config["company"],
         "PASSWORD": config["password"]
     }
     headers = {"Content-Type": "application/json"}
@@ -35,7 +35,7 @@ def authenticate(config, debug_enabled):
     else:
         raise RuntimeError(f"Login fallido: {response.status_code} - {response.text}")
 
-def enviar_entrega(token, cia, records, cronograma, attempt, debug_enabled):
+def enviar_entrega(token, company, records, cronograma, attempt, debug_enabled):
     url = "https://testri.ssn.gob.ar/api/inv/entregaSemanal"
     headers = {
         "Content-Type": "application/json",
@@ -45,11 +45,11 @@ def enviar_entrega(token, cia, records, cronograma, attempt, debug_enabled):
     # Validar y agregar CODIGOCOMPANIA a cada registro
     for record in records:
         if not record.get("CODIGOCOMPANIA"):
-            record["CODIGOCOMPANIA"] = cia
+            record["CODIGOCOMPANIA"] = company
 
     # Construir el JSON final sin la sección HEADER
     payload = {
-        "CODIGOCOMPANIA": cia,
+        "CODIGOCOMPANIA": company,
         "TIPOENTREGA": "SEMANAL",  # Ajustar según sea necesario
         "CRONOGRAMA": cronograma,  # Leer desde el nivel superior del archivo JSON
         "OPERACIONES": records
@@ -111,13 +111,13 @@ def main():
         raise ValueError("El campo 'CRONOGRAMA' está vacío o no existe en el archivo JSON.")
 
     token = authenticate(config, config.get("debug", False))
-    cia = config["cia"]
+    company = config["company"]
     retries = config.get("retries", 4)
     debug_enabled = config.get("debug", False)
 
     for attempt in range(1, retries + 1):
         try:
-            enviar_entrega(token, cia, data.get("OPERACIONES", []), cronograma, attempt, debug_enabled)
+            enviar_entrega(token, company, data.get("OPERACIONES", []), cronograma, attempt, debug_enabled)
             print("Proceso completado exitosamente.")
             break
         except RuntimeError as e:
