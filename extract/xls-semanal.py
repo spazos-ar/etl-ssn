@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 import re
 from collections import defaultdict
+import argparse  # Agregar import para manejo de argumentos
 
 def load_config():
     config_path = os.path.join('extract', 'config_xls.json')
@@ -369,33 +370,123 @@ def guardar_json_por_semana(codigo_compania, operaciones_por_semana):
     
     return archivos_generados
 
+def generate_empty_week_json(codigo_compania, cronograma):
+    """Genera un archivo JSON con solo la cabecera para una semana específica."""
+    output_data = {
+        "CODIGOCOMPANIA": codigo_compania,
+        "TIPOENTREGA": "SEMANAL",
+        "CRONOGRAMA": cronograma
+    }
+    
+    # Extraer semana del cronograma
+    _, week = cronograma.split('-')
+    
+    # Generar nombre del archivo
+    output_filename = f"Semana{week}.json"
+    output_path = os.path.join('data', output_filename)
+    
+    # Guardar el JSON
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(output_data, f, indent=4, ensure_ascii=False)
+    
+    return output_filename
+
+def validate_week_format(week_str):
+    """Valida que el formato de semana sea YYYY-WW."""
+    if not re.match(r'^\d{4}-\d{2}$', week_str):
+        return False
+    
+    try:
+        year, week = map(int, week_str.split('-'))
+        return 2000 <= year <= 2100 and 1 <= week <= 53
+    except ValueError:
+        return False
+
 def main():
     try:
+        # Configurar parser de argumentos
+        parser = argparse.ArgumentParser(description='Procesa archivo Excel con operaciones semanales.')
+        parser.add_argument('--xls-path', type=str, help='Ruta al archivo Excel a procesar')
+        parser.add_argument('--empty-week', type=str, help='Genera un JSON vacío para la semana especificada (formato YYYY-WW)')
+        args = parser.parse_args()
+
         # Cargar configuración
         config = load_config()
-        
+        codigo_compania = config['company']
+
+        # Si se especificó --empty-week, generar JSON vacío y terminar
+        if args.empty_week:
+            if not validate_week_format(args.empty_week):
+                print("\nError: El formato de semana debe ser YYYY-WW (ejemplo: 2025-18)")
+                return
+            
+            output_file = generate_empty_week_json(codigo_compania, args.empty_week)
+            print(f"\nArchivo JSON generado exitosamente: {output_file}")
+            return
+
+        # Proceder con el procesamiento normal del Excel
         # Obtener configuración de formato
         decimal_separator = config.get('decimal_separator', '.')
         date_format = config.get('date_format', 'DDMMYYYY')
+        
+        # Determinar ruta del archivo Excel (prioridad al argumento de línea de comando)
+        excel_path = args.xls_path if args.xls_path else config.get('xls_path', os.path.join('data', 'datos_semanales.xlsx'))
         
         print(f"\nUsando configuración:")
         print(f"- Código de compañía: {config['company']}")
         print(f"- Separador decimal: {decimal_separator}")
         print(f"- Formato de fecha: {date_format}")
+        print(f"- Archivo Excel: {excel_path}")
+          # Verificar que el archivo existe
+        if not os.path.isfile(excel_path):
+            # Construir mensaje de error detallado
+            mensaje_error = f"\nNo se encontró el archivo Excel: {excel_path}\n"
+            mensaje_error += "\nPosibles soluciones:"
+            
+            if args.xls_path:
+                mensaje_error += f"\n1. Verifique que la ruta proporcionada sea correcta: {args.xls_path}"
+                mensaje_error += "\n2. Use una ruta absoluta o relativa al directorio actual"
+            else:
+                mensaje_error += f"\n1. Verifique que el archivo exista en la ruta configurada en 'extract/config_xls.json'"
+                mensaje_error += f"\n2. Modifique el valor de 'xls_path' en el archivo de configuración"
+                mensaje_error += f"\n3. Especifique la ruta correcta usando el parámetro --xls-path"
+            
+            mensaje_error += "\n\nEjemplos de uso:"
+            mensaje_error += "\n- Usando configuración:"
+            mensaje_error += '\n  > python .\\extract\\xls-semanal.py'
+            mensaje_error += "\n- Especificando ruta:"
+            mensaje_error += '\n  > python .\\extract\\xls-semanal.py --xls-path "data\\datos_semanales.xlsx"'
+            
+            raise FileNotFoundError(mensaje_error)
         
-        # Leer el archivo Excel
-        excel_path = os.path.join('data', 'datos_semanales.xlsx')
-        print(f"\nLeyendo archivo Excel: {excel_path}")
+        # Leer cada hoja del Excel, manejando hojas faltantes o vacías
+        try:
+            compra_df = pd.read_excel(excel_path, sheet_name='Compra', parse_dates=False, skiprows=None)
+        except ValueError:
+            print("- Advertencia: No se encontró la hoja 'Compra'")
+            compra_df = pd.DataFrame()
+            
+        try:
+            venta_df = pd.read_excel(excel_path, sheet_name='Venta', parse_dates=False, skiprows=None)
+        except ValueError:
+            print("- Advertencia: No se encontró la hoja 'Venta'")
+            venta_df = pd.DataFrame()
+            
+        try:
+            canje_df = pd.read_excel(excel_path, sheet_name='Canje', parse_dates=False, skiprows=None)
+        except ValueError:
+            print("- Advertencia: No se encontró la hoja 'Canje'")
+            canje_df = pd.DataFrame()
+            
+        try:
+            plazo_fijo_df = pd.read_excel(excel_path, sheet_name='Plazo-Fijo', parse_dates=False, skiprows=None)
+        except ValueError:
+            print("- Advertencia: No se encontró la hoja 'Plazo-Fijo'")
+            plazo_fijo_df = pd.DataFrame()
         
-        # Leer cada hoja del Excel sin convertir fechas y sin omitir filas
-        compra_df = pd.read_excel(excel_path, sheet_name='Compra', parse_dates=False, skiprows=None)
-        venta_df = pd.read_excel(excel_path, sheet_name='Venta', parse_dates=False, skiprows=None)
-        canje_df = pd.read_excel(excel_path, sheet_name='Canje', parse_dates=False, skiprows=None)
-        plazo_fijo_df = pd.read_excel(excel_path, sheet_name='Plazo-Fijo', parse_dates=False, skiprows=None)
-        
-        # Verificar que los DataFrames no estén vacíos
-        if compra_df.empty or venta_df.empty or canje_df.empty or plazo_fijo_df.empty:
-            raise ValueError("Una o más hojas del Excel están vacías")
+        # Verificar si hay al menos una hoja con datos
+        if compra_df.empty and venta_df.empty and canje_df.empty and plazo_fijo_df.empty:
+            raise ValueError("No se encontraron datos en ninguna de las hojas del Excel")
         
         # Imprimir información de registros leídos
         print(f"\nRegistros leídos:")
@@ -411,43 +502,46 @@ def main():
         operaciones = []
         
         # Procesar y verificar cada tipo de operación con los formatos configurados
-        compras = process_compra(compra_df, decimal_separator, date_format)
-        print(f"\nOperaciones procesadas:")
-        print(f"- Compra: {len(compras)} operaciones")
-        # Verificar formato de fechas en la primera operación de cada tipo
-        if compras:
-            fecha = compras[0]['FECHAMOVIMIENTO']
-            if not validate_date_format(fecha, date_format):
-                raise ValueError(f"Fecha '{fecha}' no está en el formato configurado {date_format}")
-            print(f"  Ejemplo fecha: {fecha}")
-        operaciones.extend(compras)
+        if not compra_df.empty:
+            compras = process_compra(compra_df, decimal_separator, date_format)
+            print(f"\nOperaciones procesadas:")
+            print(f"- Compra: {len(compras)} operaciones")
+            if compras:
+                fecha = compras[0]['FECHAMOVIMIENTO']
+                if not validate_date_format(fecha, date_format):
+                    raise ValueError(f"Fecha '{fecha}' no está en el formato configurado {date_format}")
+                print(f"  Ejemplo fecha: {fecha}")
+            operaciones.extend(compras)
         
-        ventas = process_venta(venta_df, decimal_separator, date_format)
-        print(f"- Venta: {len(ventas)} operaciones")
-        if ventas:
-            fecha = ventas[0]['FECHAMOVIMIENTO']
-            if not validate_date_format(fecha, date_format):
-                raise ValueError(f"Fecha '{fecha}' no está en el formato configurado {date_format}")
-            print(f"  Ejemplo fecha: {fecha}")
-        operaciones.extend(ventas)
+        if not venta_df.empty:
+            ventas = process_venta(venta_df, decimal_separator, date_format)
+            print(f"- Venta: {len(ventas)} operaciones")
+            if ventas:
+                fecha = ventas[0]['FECHAMOVIMIENTO']
+                if not validate_date_format(fecha, date_format):
+                    raise ValueError(f"Fecha '{fecha}' no está en el formato configurado {date_format}")
+                print(f"  Ejemplo fecha: {fecha}")
+            operaciones.extend(ventas)
         
-        canjes = process_canje(canje_df, decimal_separator, date_format)
-        print(f"- Canje: {len(canjes)} operaciones")
-        if canjes:
-            fecha = canjes[0]['FECHAMOVIMIENTO']
-            if not validate_date_format(fecha, date_format):
-                raise ValueError(f"Fecha '{fecha}' no está en el formato configurado {date_format}")
-            print(f"  Ejemplo fecha: {fecha}")
-        operaciones.extend(canjes)
+        if not canje_df.empty:
+            canjes = process_canje(canje_df, decimal_separator, date_format)
+            print(f"- Canje: {len(canjes)} operaciones")
+            if canjes:
+                fecha = canjes[0]['FECHAMOVIMIENTO']
+                if not validate_date_format(fecha, date_format):
+                    raise ValueError(f"Fecha '{fecha}' no está en el formato configurado {date_format}")
+                print(f"  Ejemplo fecha: {fecha}")
+            operaciones.extend(canjes)
         
-        plazos_fijos = process_plazo_fijo(plazo_fijo_df, decimal_separator, date_format)
-        print(f"- Plazo Fijo: {len(plazos_fijos)} operaciones")
-        if plazos_fijos:
-            fecha = plazos_fijos[0]['FECHACONSTITUCION']
-            if not validate_date_format(fecha, date_format):
-                raise ValueError(f"Fecha '{fecha}' no está en el formato configurado {date_format}")
-            print(f"  Ejemplo fecha: {fecha}")
-        operaciones.extend(plazos_fijos)
+        if not plazo_fijo_df.empty:
+            plazos_fijos = process_plazo_fijo(plazo_fijo_df, decimal_separator, date_format)
+            print(f"- Plazo Fijo: {len(plazos_fijos)} operaciones")
+            if plazos_fijos:
+                fecha = plazos_fijos[0]['FECHACONSTITUCION']
+                if not validate_date_format(fecha, date_format):
+                    raise ValueError(f"Fecha '{fecha}' no está en el formato configurado {date_format}")
+                print(f"  Ejemplo fecha: {fecha}")
+            operaciones.extend(plazos_fijos)
         
         print(f"\nTotal de operaciones procesadas: {len(operaciones)}")
         
@@ -472,4 +566,10 @@ def main():
         raise
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except FileNotFoundError as e:
+        print(str(e))
+    except Exception as e:
+        print(f"\nError inesperado al procesar el archivo Excel:")
+        print(str(e))
