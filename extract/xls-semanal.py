@@ -112,10 +112,9 @@ def process_plazo_fijo(df):
         records.append(record)
     return records
 
-def main():    # Cargar configuración
+def main():
+    # Cargar configuración
     config = load_config()
-    print(f"\nConfiguración cargada del archivo config_xls.json:")
-    print(f"- Código de compañía: {config['company']}")
     
     # Leer el archivo Excel
     excel_path = os.path.join('data', 'datos_semanales.xlsx')
