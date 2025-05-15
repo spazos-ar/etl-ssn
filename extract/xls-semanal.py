@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 import os
 import re
+from collections import defaultdict
 
 def load_config():
     config_path = os.path.join('extract', 'config_xls.json')
@@ -254,7 +255,8 @@ def process_compra(df, decimal_separator='.', date_format='DDMMYYYY'):
             "TIPOVALUACION": str(row['TIPOVALUACION']),
             "FECHAMOVIMIENTO": format_date(row['FECHAMOVIMIENTO'], date_format),
             "PRECIOCOMPRA": format_number(row['PRECIOCOMPRA'], decimal_separator),
-            "FECHALIQUIDACION": format_date(row['FECHALIQUIDACION'], date_format)
+            "FECHALIQUIDACION": format_date(row['FECHALIQUIDACION'], date_format),
+            "__CRONOGRAMA": str(row['CRONOGRAMA'])  # Campo auxiliar para agrupar por semana
         }
         records.append(record)
     return records
@@ -273,7 +275,8 @@ def process_venta(df, decimal_separator='.', date_format='DDMMYYYY'):
             "FECHAPASEVT": format_date(row['FECHAPASEVT'], date_format) if 'FECHAPASEVT' in row else "",
             "PRECIOPASEVT": str(row['PRECIOPASEVT']) if 'PRECIOPASEVT' in row else "",
             "FECHALIQUIDACION": format_date(row['FECHALIQUIDACION'], date_format),
-            "PRECIOVENTA": format_number(row['PRECIOVENTA'], decimal_separator)
+            "PRECIOVENTA": format_number(row['PRECIOVENTA'], decimal_separator),
+            "__CRONOGRAMA": str(row['CRONOGRAMA'])  # Campo auxiliar para agrupar por semana
         }
         records.append(record)
     return records
@@ -298,7 +301,8 @@ def process_canje(df, decimal_separator='.', date_format='DDMMYYYY'):
             "FECHAPASEVTB": format_date(row['FECHAPASEVTB'], date_format) if 'FECHAPASEVTB' in row else "",
             "PRECIOPASEVTB": str(row['PRECIOPASEVTB']) if 'PRECIOPASEVTB' in row else "",
             "FECHAMOVIMIENTO": format_date(row['FECHAMOVIMIENTO'], date_format),
-            "FECHALIQUIDACION": format_date(row['FECHALIQUIDACION'], date_format)
+            "FECHALIQUIDACION": format_date(row['FECHALIQUIDACION'], date_format),
+            "__CRONOGRAMA": str(row['CRONOGRAMA'])  # Campo auxiliar para agrupar por semana
         }
         records.append(record)
     return records
@@ -320,10 +324,50 @@ def process_plazo_fijo(df, decimal_separator='.', date_format='DDMMYYYY'):
             "TIPOTASA": str(row['TIPOTASA']),
             "TASA": format_number(row['TASA'], decimal_separator),
             "TITULODEUDA": int(row['TITULODEUDA']),
-            "CODIGOTITULO": str(row['CODIGOTITULO'] if not pd.isna(row['CODIGOTITULO']) else "")
+            "CODIGOTITULO": str(row['CODIGOTITULO'] if not pd.isna(row['CODIGOTITULO']) else ""),
+            "__CRONOGRAMA": str(row['CRONOGRAMA'])  # Campo auxiliar para agrupar por semana
         }
         records.append(record)
     return records
+
+def agrupar_por_semana(operaciones):
+    """Agrupa las operaciones por semana y elimina el campo auxiliar __CRONOGRAMA."""
+    operaciones_por_semana = defaultdict(list)
+    
+    for op in operaciones:
+        cronograma = op.pop('__CRONOGRAMA', None)  # Eliminar campo auxiliar y obtener valor
+        if cronograma:
+            operaciones_por_semana[cronograma].append(op)
+    
+    return dict(operaciones_por_semana)
+
+def guardar_json_por_semana(codigo_compania, operaciones_por_semana):
+    """Guarda un archivo JSON por cada semana encontrada."""
+    archivos_generados = []
+    
+    for cronograma, operaciones in operaciones_por_semana.items():
+        # Crear el JSON
+        output_data = {
+            "CODIGOCOMPANIA": codigo_compania,
+            "TIPOENTREGA": "SEMANAL",
+            "CRONOGRAMA": cronograma,
+            "OPERACIONES": operaciones
+        }
+        
+        # Extraer año y semana del cronograma (formato YYYY-SS)
+        year, week = cronograma.split('-')
+        
+        # Generar nombre del archivo de salida
+        output_filename = f"Semana{week}.json"
+        output_path = os.path.join('data', output_filename)
+        
+        # Guardar el JSON
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(output_data, f, indent=4, ensure_ascii=False)
+            
+        archivos_generados.append((output_filename, len(operaciones)))
+    
+    return archivos_generados
 
 def main():
     try:
@@ -360,9 +404,8 @@ def main():
         print(f"- Canje: {len(canje_df)} registros")
         print(f"- Plazo Fijo: {len(plazo_fijo_df)} registros")
         
-        # Obtener información de la cabecera
+        # Obtener información de la compañía
         codigo_compania = config['company']
-        cronograma = str(compra_df['CRONOGRAMA'].iloc[0])
         
         # Procesar cada tipo de operación
         operaciones = []
@@ -406,28 +449,18 @@ def main():
             print(f"  Ejemplo fecha: {fecha}")
         operaciones.extend(plazos_fijos)
         
-        print(f"\nTotal de operaciones a escribir en JSON: {len(operaciones)}")
+        print(f"\nTotal de operaciones procesadas: {len(operaciones)}")
         
-        # Crear el JSON final
-        output_data = {
-            "CODIGOCOMPANIA": codigo_compania,
-            "TIPOENTREGA": "SEMANAL",
-            "CRONOGRAMA": cronograma,
-            "OPERACIONES": operaciones
-        }
+        # Agrupar operaciones por semana
+        operaciones_por_semana = agrupar_por_semana(operaciones)
         
-        # Extraer año y semana del cronograma (formato YYYY-SS)
-        year, week = cronograma.split('-')
+        # Guardar un archivo JSON por cada semana
+        archivos_generados = guardar_json_por_semana(codigo_compania, operaciones_por_semana)
         
-        # Generar nombre del archivo de salida
-        output_filename = f"Semana{week}.json"
-        output_path = os.path.join('data', output_filename)
-        
-        # Guardar el JSON
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(output_data, f, indent=4, ensure_ascii=False)
-        
-        print(f"\nArchivo JSON generado exitosamente: {output_path}")
+        # Mostrar resumen de archivos generados
+        print("\nArchivos JSON generados:")
+        for archivo, total_operaciones in archivos_generados:
+            print(f"- {archivo}: {total_operaciones} operaciones")
         
     except ValueError as e:
         print("\nError de formato en el archivo Excel:")
