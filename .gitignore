@@ -1,0 +1,48 @@
+# Excluir archivos de credenciales y configuraciones sensibles
+*.json
+!data/*.json
+!docs/*.json
+
+# Archivos de configuración específicos del entorno
+*.env
+*.ini
+
+# Archivos de caché de Python
+__pycache__/
+*.py[cod]
+
+# Archivos de logs
+*.log
+
+# Archivos de datos temporales
+*.tmp
+*.temp
+
+# Archivos de salida de pruebas
+*.out
+*.err
+
+# Archivos de Excel y otros datos
+*.xlsx
+
+# Archivos de configuración de IDE
+.vscode/
+.idea/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Excluir binarios
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Excluir dependencias instaladas
+venv/
+.env/
+
+# Excluir archivos de Singer ETL
+state.json
+catalog.json
