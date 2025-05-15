@@ -35,7 +35,7 @@ def authenticate(config, debug_enabled):
     else:
         raise RuntimeError(f"Login fallido: {response.status_code} - {response.text}")
 
-def enviar_entrega(token, cia, records, attempt, debug_enabled):
+def enviar_entrega(token, cia, records, cronograma, attempt, debug_enabled):
     url = "https://testri.ssn.gob.ar/api/inv/entregaSemanal"
     headers = {
         "Content-Type": "application/json",
@@ -51,7 +51,7 @@ def enviar_entrega(token, cia, records, attempt, debug_enabled):
     payload = {
         "CODIGOCOMPANIA": cia,
         "TIPOENTREGA": "SEMANAL",  # Ajustar según sea necesario
-        "CRONOGRAMA": "2025-20",  # Ajustar según sea necesario
+        "CRONOGRAMA": cronograma,  # Leer desde el nivel superior del archivo JSON
         "OPERACIONES": records
     }
 
@@ -63,7 +63,7 @@ def enviar_entrega(token, cia, records, attempt, debug_enabled):
     if response.status_code == 200:
         print(json.dumps({
             "type": "STATE",
-            "value": {"last_sent": records[-1].get("CRONOGRAMA", "unknown")}
+            "value": {"last_sent": cronograma}
         }))
     else:
         # Extraer y mostrar errores de manera clara
@@ -106,6 +106,10 @@ def main():
     with open(data_path, 'r') as data_file:
         data = json.load(data_file)
 
+    cronograma = data.get("CRONOGRAMA", "")
+    if not cronograma:
+        raise ValueError("El campo 'CRONOGRAMA' está vacío o no existe en el archivo JSON.")
+
     token = authenticate(config, config.get("debug", False))
     cia = config["cia"]
     retries = config.get("retries", 4)
@@ -113,7 +117,7 @@ def main():
 
     for attempt in range(1, retries + 1):
         try:
-            enviar_entrega(token, cia, data.get("OPERACIONES", []), attempt, debug_enabled)
+            enviar_entrega(token, cia, data.get("OPERACIONES", []), cronograma, attempt, debug_enabled)
             print("Proceso completado exitosamente.")
             break
         except RuntimeError as e:
