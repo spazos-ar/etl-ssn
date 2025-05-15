@@ -1,0 +1,66 @@
+{
+    "CODIGOCOMPANIA": "0540",
+    "TIPOENTREGA": "SEMANAL",
+    "CRONOGRAMA": "2025-20",
+    "OPERACIONES": [
+        {
+            "TIPOOPERACION": "C",
+            "TIPOESPECIE": "FC",
+            "CODIGOESPECIE": "688",
+            "CANTESPECIES": 5263.6587,
+            "CODIGOAFECTACION": "999",
+            "TIPOVALUACION": "V",
+            "FECHAMOVIMIENTO": "13052025",
+            "PRECIOCOMPRA": 150.25,
+            "FECHALIQUIDACION": "14052025"
+        },
+        {
+            "TIPOOPERACION": "V",
+            "TIPOESPECIE": "AC",
+            "CODIGOESPECIE": "AUSOAR",
+            "CANTESPECIES": 2500,
+            "CODIGOAFECTACION": "999",
+            "TIPOVALUACION": "V",
+            "FECHAMOVIMIENTO": "13052025",
+            "FECHAPASEVT": "",
+            "PRECIOPASEVT": "" ,
+            "FECHALIQUIDACION": "14052025",
+            "PRECIOVENTA": 100
+        },
+        {
+            "TIPOOPERACION": "J",
+            "TIPOESPECIEA": "AC",
+            "CODIGOESPECIEA": "DGCUZAR",
+            "CANTESPECIESA": 300,
+            "CODIGOAFECTACIONA": "999",
+            "TIPOVALUACIONA": "V",
+            "FECHAPASEVTA": "",
+            "PRECIOPASEVTA": "",
+            "TIPOESPECIEB": "AC",
+            "CODIGOESPECIEB": "ECOGAR",
+            "CANTESPECIESB": 200,
+            "CODIGOAFECTACIONB": "999",
+            "TIPOVALUACIONB": "V",
+            "FECHAPASEVTB": "",
+            "PRECIOPASEVTB": "" ,
+            "FECHAMOVIMIENTO": "14052025",
+            "FECHALIQUIDACION": "14052025"
+        },
+        {
+            "TIPOOPERACION": "P",
+            "TIPOPF": "004",
+            "BIC": "CORRARSSN",
+            "CDF": "296184",
+            "FECHACONSTITUCION": "14052025",
+            "FECHAVENCIMIENTO": "14062025",
+            "MONEDA": "ARS",
+            "VALORNOMINALORIGEN": 1000000,
+            "VALORNOMINALNACIONAL": 1000000,
+            "CODIGOAFECTACION": "999",
+            "TIPOTASA": "F",
+            "TASA": 72.5000,
+            "TITULODEUDA": 0,
+            "CODIGOTITULO": ""
+        }
+    ]
+}

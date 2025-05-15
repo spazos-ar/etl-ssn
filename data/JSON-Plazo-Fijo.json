@@ -1,0 +1,23 @@
+{
+   "CODIGOCOMPANIA":"STRING",
+   "TIPOENTREGA":"STRING",
+   "CRONOGRAMA":"STRING",
+   "OPERACIONES":[
+      {
+         "TIPOOPERACION":"P",
+         "TIPOPF":"STRING",
+         "BIC":"STRING",
+         "CDF":"STRING",
+         "FECHACONSTITUCION":"STRING",
+         "FECHAVENCIMIENTO":"STRING",
+         "MONEDA":"STRING",
+         "VALORNOMINALORIGEN":"NUMBER",
+         "VALORNOMINALNACIONAL":"NUMBER",
+         "CODIGOAFECTACION":"STRING",
+         "TIPOTASA":"STRING",
+         "TASA":"NUMBER",
+         "TITULODEUDA":true,
+         "CODIGOTITULO":"STRING"
+      }
+   ]
+}
