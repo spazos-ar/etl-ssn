@@ -118,13 +118,13 @@ def process_canje(df, decimal_separator='.', date_format='DDMMYYYY'):
             "PRECIOPASEVTA": str(row['PRECIOPASEVTA']) if 'PRECIOPASEVTA' in row else "",
             "TIPOESPECIEB": str(row['TIPOESPECIEB']),
             "CODIGOESPECIEB": str(row['CODIGOESPECIEB']),
-            "CANTESPECIESB": format_number(row['CANTESPECIESB'], decimal_separator),
+            "CANTESPECIESB": format_number(row['CANTESPECIESB']),
             "CODIGOAFECTACIONB": str(row['CODIGOAFECTACIONB']),
             "TIPOVALUACIONB": str(row['TIPOVALUACIONB']),
-            "FECHAPASEVTB": format_date(row['FECHAPASEVTB'], date_format) if 'FECHAPASEVTB' in row else "",
+            "FECHAPASEVTB": format_date(row['FECHAPASEVTB']) if 'FECHAPASEVTB' in row else "",
             "PRECIOPASEVTB": str(row['PRECIOPASEVTB']) if 'PRECIOPASEVTB' in row else "",
-            "FECHAMOVIMIENTO": format_date(row['FECHAMOVIMIENTO'], date_format),
-            "FECHALIQUIDACION": format_date(row['FECHALIQUIDACION'], date_format)
+            "FECHAMOVIMIENTO": format_date(row['FECHAMOVIMIENTO']),
+            "FECHALIQUIDACION": format_date(row['FECHALIQUIDACION'])
         }
         records.append(record)
     return records
@@ -167,48 +167,49 @@ def main():
         
         # Leer el archivo Excel
         excel_path = os.path.join('data', 'datos_semanales.xlsx')
-        print(f"\nLeyendo archivo Excel: {excel_path}")
-        
+    
+    try:
+        print("Leyendo archivo Excel:", excel_path)
         # Leer cada hoja del Excel sin convertir fechas y sin omitir filas
         compra_df = pd.read_excel(excel_path, sheet_name='Compra', parse_dates=False, skiprows=None)
         venta_df = pd.read_excel(excel_path, sheet_name='Venta', parse_dates=False, skiprows=None)
         canje_df = pd.read_excel(excel_path, sheet_name='Canje', parse_dates=False, skiprows=None)
         plazo_fijo_df = pd.read_excel(excel_path, sheet_name='Plazo-Fijo', parse_dates=False, skiprows=None)
+          # Imprimir información detallada de cada DataFrame
+        print("\n=== Detalles de registros leídos ===")
+        for name, df in [("Compra", compra_df), ("Venta", venta_df), ("Canje", canje_df), ("Plazo Fijo", plazo_fijo_df)]:
+            print(f"\n{name}:")
+            print(f"- Número de filas: {len(df)}")
+            print(f"- Columnas: {', '.join(df.columns)}")
+            print("- Primeros registros:")
+            print(df.head())
+            print("-" * 80)
         
         # Verificar que los DataFrames no estén vacíos
         if compra_df.empty or venta_df.empty or canje_df.empty or plazo_fijo_df.empty:
             raise ValueError("Una o más hojas del Excel están vacías")
         
-        # Imprimir información de registros leídos
-        print(f"\nRegistros leídos:")
-        print(f"- Compra: {len(compra_df)} registros")
-        print(f"- Venta: {len(venta_df)} registros")
-        print(f"- Canje: {len(canje_df)} registros")
-        print(f"- Plazo Fijo: {len(plazo_fijo_df)} registros")
-        
         # Obtener información de la cabecera
         codigo_compania = config['company']
         cronograma = str(compra_df['CRONOGRAMA'].iloc[0])
-        
-        # Procesar cada tipo de operación
+          # Procesar cada tipo de operación
         operaciones = []
         
         # Procesar y verificar cada tipo de operación con los formatos configurados
         compras = process_compra(compra_df, decimal_separator, date_format)
-        print(f"\nOperaciones procesadas:")
-        print(f"- Compra: {len(compras)} operaciones")
+        print(f"\nOperaciones de compra procesadas: {len(compras)}")
         operaciones.extend(compras)
         
         ventas = process_venta(venta_df, decimal_separator, date_format)
-        print(f"- Venta: {len(ventas)} operaciones")
+        print(f"Operaciones de venta procesadas: {len(ventas)}")
         operaciones.extend(ventas)
         
         canjes = process_canje(canje_df, decimal_separator, date_format)
-        print(f"- Canje: {len(canjes)} operaciones")
+        print(f"Operaciones de canje procesadas: {len(canjes)}")
         operaciones.extend(canjes)
         
         plazos_fijos = process_plazo_fijo(plazo_fijo_df, decimal_separator, date_format)
-        print(f"- Plazo Fijo: {len(plazos_fijos)} operaciones")
+        print(f"Operaciones de plazo fijo procesadas: {len(plazos_fijos)}")
         operaciones.extend(plazos_fijos)
         
         print(f"\nTotal de operaciones a escribir en JSON: {len(operaciones)}")
@@ -233,14 +234,12 @@ def main():
             json.dump(output_data, f, indent=4, ensure_ascii=False)
         
         print(f"\nArchivo JSON generado exitosamente: {output_path}")
-        
-    except ValueError as e:
+          except ValueError as e:
         print("\nError de formato en el archivo Excel:")
         print(str(e))
         return
     except Exception as e:
-        print(f"\nError inesperado al procesar el archivo Excel:")
-        print(str(e))
+        print(f"\nError inesperado al procesar el archivo Excel: {str(e)}")
         raise
 
 if __name__ == "__main__":
