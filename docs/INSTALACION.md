@@ -1,6 +1,6 @@
 # Guía de Instalación
 
-Esta guía te ayudará a configurar todo lo necesario para ejecutar el sistema ETL SSN en Windows 10/11.
+Esta guía te va a ayudar a configurar todo lo necesario para ejecutar el sistema ETL SSN en Windows 10/11.
 
 ## Prerequisitos
 
@@ -8,13 +8,13 @@ Esta guía te ayudará a configurar todo lo necesario para ejecutar el sistema E
 
 Git es necesario para clonar el repositorio. Para instalarlo:
 
-1. Descarga Git para Windows desde [https://git-scm.com/download/win](https://git-scm.com/download/win)
-2. Ejecuta el instalador descargado
+1. Descargá Git para Windows desde [https://git-scm.com/download/win](https://git-scm.com/download/win)
+2. Ejecutá el instalador descargado
 3. Durante la instalación:
-   - Mantén las opciones por defecto
-   - En "Adjusting your PATH environment", selecciona "Git from the command line and also from 3rd-party software"
-   - En "Choosing HTTPS transport backend", selecciona "Use the native Windows Secure Channel library"
-4. Completa la instalación
+   - Dejá las opciones por defecto
+   - En "Adjusting your PATH environment", seleccioná "Git from the command line and also from 3rd-party software"
+   - En "Choosing HTTPS transport backend", seleccioná "Use the native Windows Secure Channel library"
+4. Completá la instalación
 
 Para verificar la instalación, abre PowerShell y ejecuta:
 ```powershell
@@ -25,11 +25,11 @@ git --version
 
 El proyecto requiere Python 3.8 o superior:
 
-1. Descarga Python desde [https://www.python.org/downloads/](https://www.python.org/downloads/)
-   - Asegúrate de descargar la versión de 64 bits para Windows
-2. Ejecuta el instalador
-3. **¡IMPORTANTE!** Marca la opción "Add Python to PATH" antes de comenzar la instalación
-4. Selecciona "Install Now" para una instalación estándar
+1. Descargá Python desde [https://www.python.org/downloads/](https://www.python.org/downloads/)
+   - Asegurate de descargar la versión de 64 bits para Windows
+2. Ejecutá el instalador
+3. **¡IMPORTANTE!** Marcá la opción "Add Python to PATH" antes de comenzar la instalación
+4. Seleccioná "Install Now" para una instalación estándar
 
 Para verificar la instalación, abre PowerShell y ejecuta:
 ```powershell
@@ -121,21 +121,21 @@ python .\extract\xls-semanal.py --xls-path .\docs\datos_prueba_SEMANAL.xlsx
 ## Solución de Problemas
 
 ### Error: "python no se reconoce como un comando..."
-- Verifica que Python esté en el PATH de Windows
-- Reinicia PowerShell después de instalar Python
+- Verificá que Python esté en el PATH de Windows
+- Reiniciá PowerShell después de instalar Python
 
 ### Error al activar el entorno virtual
-- Ejecuta `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
-- Asegúrate de estar en el directorio correcto al activar el entorno
+- Ejecutá `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+- Asegurate de estar en el directorio correcto al activar el entorno
 
 ### Error al instalar dependencias
-- Verifica que estés usando pip desde el entorno virtual
-- Actualiza pip: `python -m pip install --upgrade pip`
+- Verificá que estés usando pip desde el entorno virtual
+- Actualizá pip: `python -m pip install --upgrade pip`
 
 ### Errores de conexión con la SSN
-- Verifica tus credenciales en el archivo `.env`
-- Asegúrate de tener conexión a Internet
-- Verifica que los endpoints en `upload/config.json` sean correctos
+- Verificá tus credenciales en el archivo `.env`
+- Asegurate de tener conexión a Internet
+- Verificá que los endpoints en `upload/config.json` sean correctos
 
 ## Ayuda Adicional
 

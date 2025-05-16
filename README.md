@@ -1,12 +1,12 @@
 # ETL SSN
 
-Sistema de extracción y carga de datos para la Superintendencia de Seguros de la Nación (SSN). Este proyecto automatiza el proceso de carga de información semanal que pide la SSN, facilitando el cumplimiento de las obligaciones regulatorias de las compañías de seguros.
+Sistema de extracción y carga de datos para la Superintendencia de Seguros de la Nación (SSN). Este proyecto automatiza el proceso de carga de información semanal requerido por la SSN, facilitando el cumplimiento de las obligaciones regulatorias de las compañías de seguros.
 
 ## Descripción
 
 El sistema tiene dos componentes principales:
 
-1. **Extracción de datos**: Procesa los archivos Excel semanales que están en la carpeta `data/` y los prepara según el formato que pide la SSN.
+1. **Extracción de datos**: Procesa los archivos Excel semanales ubicados en la carpeta `data/` y los prepara según el formato requerido por la SSN.
 2. **Carga de datos**: Sube automáticamente la información procesada al sistema de la SSN usando las credenciales configuradas.
 
 ### Estructura del proyecto
@@ -130,14 +130,15 @@ Los dos scripts usan la configuración de sus respectivos archivos `config.json`
 ### Archivos de configuración
 
 - `extract/config.json`: Te permite configurar los parámetros de extracción y procesamiento
-- `upload/config.json`: Configura los parámetros de conexión y carga al sistema SSN
+- `upload/config.json`: Configurá los parámetros de conexión y carga al sistema SSN
 
 ### Documentación adicional
 
 En la carpeta `docs/` vas a encontrar:
-- Especificaciones técnicas del formato que pide la SSN
+- Especificaciones técnicas del formato requerido por la SSN
 - Ejemplos de archivos de datos para hacer pruebas
+- Guía de instalación detallada para Windows 10/11
 
 ## Soporte
 
-Para reportar problemas o pedir mejoras, creá un issue en el repositorio.
+Si encontrás algún problema o querés sugerir mejoras, creá un issue en el repositorio.
