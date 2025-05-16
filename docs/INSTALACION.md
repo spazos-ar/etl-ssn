@@ -42,13 +42,21 @@ pip --version
 ### 1. Clonar el Repositorio
 
 1. Abre PowerShell
-2. Navega a la carpeta donde quieras guardar el proyecto:
+
+2. Crea y navega al directorio recomendado para proyectos (si no existe, los comandos lo crearán):
 ```powershell
+# Crear las carpetas si no existen
+New-Item -ItemType Directory -Force -Path "$HOME\source\repos"
+
+# Navegar a la carpeta
 cd $HOME\source\repos
 ```
+
+> **Nota**: Se recomienda usar la estructura `source\repos` en tu carpeta de usuario para mantener organizados todos tus proyectos, siguiendo las buenas prácticas de desarrollo en Windows.
+
 3. Clona el repositorio:
 ```powershell
-git clone <URL_DEL_REPOSITORIO>
+git clone https://github.com/spazos-ar/etl-ssn.git
 cd etl-ssn
 ```
 
