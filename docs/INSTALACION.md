@@ -47,7 +47,8 @@ pip --version
 ```powershell
 # Crear las carpetas si no existen
 New-Item -ItemType Directory -Force -Path "$HOME\source\repos"
-
+```
+```
 # Navegar a la carpeta
 cd $HOME\source\repos
 ```
@@ -57,6 +58,8 @@ cd $HOME\source\repos
 3. Clona el repositorio:
 ```powershell
 git clone https://github.com/spazos-ar/etl-ssn.git
+```
+```
 cd etl-ssn
 ```
 
@@ -73,7 +76,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate
 ```
 ```
-# Si ves un error de ejecución de scripts, ejecuta esto como administrador:
+# Si ves un error de scripts, corré PowerShell como administrador y ejecutá:
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
