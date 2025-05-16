@@ -67,10 +67,12 @@ Es una buena práctica usar un entorno virtual para aislar las dependencias:
 ```powershell
 # Crear el entorno virtual
 python -m venv .venv
-
+```
+```
 # Activar el entorno virtual
 .\.venv\Scripts\Activate
-
+```
+```
 # Si ves un error de ejecución de scripts, ejecuta esto como administrador:
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
@@ -97,9 +99,9 @@ notepad .env
 
 3. Completa las siguientes variables con tus credenciales:
 ```
-SSN_USER=tu_usuario
-SSN_PASSWORD=tu_contraseña
-SSN_COMPANY=tu_codigo_compania
+SSN_USER=usuario
+SSN_PASSWORD=contraseña
+SSN_COMPANY=codigo_compania
 ```
 
 ## Verificar la Instalación
@@ -110,7 +112,7 @@ Para verificar que todo esté correctamente instalado:
 
 2. Prueba el script de extracción:
 ```powershell
-python .\extract\xls-semanal.py --xls-path .\docs\datos_prueba_SEMANAL.xlsx
+python .\extract\xls-semanal.py --xls-path .\data\datos_semanales.xlsx
 ```
 
 3. Si no hay errores, prueba una consulta al sistema SSN:

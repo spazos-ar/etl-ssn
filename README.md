@@ -58,13 +58,13 @@ pip install -r requirements.txt
 # Extraer datos y enviarlos automáticamente a la SSN con confirmación
 .\Procesar.bat datos_semanales.xlsx full
 
-# Enviar los JSONs que ya están en data/
+# Enviar y confirmar los JSONs que ya están en data/
 .\Procesar.bat upload
 
 # Consultar el estado de una semana específica
 .\Procesar.bat query 2025-15
 
-# Corregir datos de una semana específica
+# Pedir rectificativa de una semana específica
 .\Procesar.bat fix 2025-15
 ```
 
@@ -100,7 +100,7 @@ Los argumentos disponibles son:
 Este script se encarga de subir y gestionar los datos en el sistema de la SSN:
 
 ```powershell
-# Cargar un archivo JSON de datos
+# Cargar un archivo JSON de datos - sin confirmacion
 python upload/ssn-semanal.py data/Semana15.json
 
 # Cargar y confirmar un archivo JSON de datos
@@ -109,7 +109,7 @@ python upload/ssn-semanal.py --confirm-week data/Semana15.json
 # Consultar el estado de una semana específica
 python upload/ssn-semanal.py --query-week 2025-15
 
-# Corregir datos de una semana específica
+# Pedir Rectificativa de una semana específica
 python upload/ssn-semanal.py --fix-week 2025-15
 
 # Especificar un archivo de configuración alternativo
@@ -119,7 +119,7 @@ python upload/ssn-semanal.py --config otra-config.json data/Semana15.json
 Los argumentos disponibles son:
 - `--config`: Ruta al archivo de configuración (opcional, por defecto usa `upload/config.json`)
 - `--confirm-week`: Confirma la entrega semanal y mueve el archivo a processed/
-- `--fix-week YYYY-WW`: Corrige los datos de una semana específica
+- `--fix-week YYYY-WW`: Pide rectificativa de una semana específica
 - `--query-week YYYY-WW`: Consulta el estado de una semana específica
 
 Los dos scripts usan la configuración de sus respectivos archivos `config.json` y las credenciales del archivo `.env`. Las credenciales requeridas son:
