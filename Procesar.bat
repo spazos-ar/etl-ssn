@@ -39,17 +39,14 @@ if not exist "!EXTRACT_CONFIG!" (
     exit /b 1
 )
 
-set "EXCEL_FILE=!DATA_DIR!\%~1"
+REM Determinar ruta del Excel eliminando .\data\ si existe en el parámetro
+set "EXCEL_NAME=%~1"
+set "EXCEL_NAME=!EXCEL_NAME:.\data\=!"
+set "EXCEL_FILE=!DATA_DIR!\!EXCEL_NAME!"
+
 if not exist "!EXCEL_FILE!" (
     echo Error: No se encuentra el archivo Excel !EXCEL_FILE!
     exit /b 1
-)
-
-if /i "!MODO!"=="full" (
-    if not exist "!UPLOAD_CONFIG!" (
-        echo Error: No se encuentra el archivo de configuracion !UPLOAD_CONFIG!
-        exit /b 1
-    )
 )
 
 echo Modo: !MODO!
