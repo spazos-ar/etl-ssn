@@ -9,6 +9,7 @@ if "%~1"=="" (
     echo   Procesar.bat datos_semanales.xlsx full    - Extraer y enviar con confirmación
     echo   Procesar.bat upload                       - Solo enviar JSONs existentes
     echo   Procesar.bat query YYYY-WW                - Consultar estado de una semana
+    echo   Procesar.bat fix YYYY-WW                  - Corregir datos de una semana
     exit /b 1
 )
 
@@ -21,7 +22,7 @@ set "DATA_DIR=.\data"
 REM Crear carpeta processed si no existe
 if not exist "!PROCESSED_DIR!" mkdir "!PROCESSED_DIR!"
 
-REM Procesar comandos especiales
+REM Procesar comando query
 if "%~1"=="query" (
     if "%~2"=="" (
         echo Error: Debe especificar la semana en formato YYYY-WW
@@ -29,6 +30,17 @@ if "%~1"=="query" (
         exit /b 1
     )
     python .\upload\ssn-semanal.py --query-week %2
+    exit /b !ERRORLEVEL!
+)
+
+REM Procesar comando fix
+if "%~1"=="fix" (
+    if "%~2"=="" (
+        echo Error: Debe especificar la semana en formato YYYY-WW
+        echo Ejemplo: Procesar.bat fix 2025-15
+        exit /b 1
+    )
+    python .\upload\ssn-semanal.py --fix-week %2
     exit /b !ERRORLEVEL!
 )
 
@@ -47,9 +59,15 @@ if "%~1"=="upload" (
 )
 
 REM Procesar archivo Excel
-if exist "%~1" (
-    echo Extrayendo datos de %~1...
-    python .\extract\xls-semanal.py --config "!EXTRACT_CONFIG!" "%~1"
+set "EXCEL_FILE=%~1"
+if not exist "!EXCEL_FILE!" (
+    REM Si no existe en la ruta actual, buscar en la carpeta data
+    set "EXCEL_FILE=!DATA_DIR!\%~1"
+)
+
+if exist "!EXCEL_FILE!" (
+    echo Extrayendo datos de !EXCEL_FILE!...
+    python .\extract\xls-semanal.py --config "!EXTRACT_CONFIG!" --xls-path "!EXCEL_FILE!"
     if !ERRORLEVEL! neq 0 (
         echo Error al extraer datos
         exit /b !ERRORLEVEL!
