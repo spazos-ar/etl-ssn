@@ -21,7 +21,13 @@ El sistema tiene dos componentes principales:
   - `ssn-semanal.py`: Script para la carga automática al sistema SSN
   - `config.json`: Configuración del proceso de carga
 
+## Instalación
+
+Para una guía detallada de instalación en Windows 10/11, incluyendo la instalación de Git, Python y la configuración del entorno, consultá [docs/INSTALACION.md](docs/INSTALACION.md).
+
 ## Configuración inicial
+
+Una vez instalados los prerequisitos:
 
 1. Instalá las dependencias del proyecto:
 ```powershell
@@ -46,14 +52,20 @@ pip install -r requirements.txt
 2. El script `Procesar.bat` tiene estas opciones de uso:
 
 ```powershell
-# Solo extraer datos del Excel
+# Extraer datos del Excel
 .\Procesar.bat datos_semanales.xlsx
 
-# Extraer datos y mandarlos a la SSN
+# Extraer datos y enviarlos automáticamente a la SSN con confirmación
 .\Procesar.bat datos_semanales.xlsx full
 
-# Solo mandar los JSONs que ya están en data/
+# Enviar los JSONs que ya están en data/
 .\Procesar.bat upload
+
+# Consultar el estado de una semana específica
+.\Procesar.bat query 2025-15
+
+# Corregir datos de una semana específica
+.\Procesar.bat fix 2025-15
 ```
 
 El script va a hacer automáticamente según la opción que elijas:
@@ -72,29 +84,48 @@ Si necesitás ejecutar los scripts de Python por separado, podés hacerlo así:
 Este script procesa los archivos Excel y genera los JSONs necesarios para la carga:
 
 ```powershell
-# Procesar un archivo Excel específico
+# Procesar un archivo Excel (ruta requerida)
 python extract/xls-semanal.py --xls-path data/datos_semanales.xlsx
 
-# Procesar el archivo Excel especificando además la ruta del archivo de configuración
-python extract/xls-semanal.py --config extract/config.json --xls-path data/datos_semanales.xlsx
+# Especificar un archivo de configuración alternativo
+python extract/xls-semanal.py --config otra-config.json --xls-path data/datos_semanales.xlsx
 ```
+
+Los argumentos disponibles son:
+- `--xls-path`: Ruta al archivo Excel a procesar (requerido)
+- `--config`: Ruta al archivo de configuración (opcional, por defecto usa `extract/config.json`)
 
 #### Script de carga (`upload/ssn-semanal.py`)
 
-Este script se encarga de subir los JSONs al sistema de la SSN:
+Este script se encarga de subir y gestionar los datos en el sistema de la SSN:
 
 ```powershell
-# Cargar todos los JSONs de la carpeta data/
-python upload/ssn-semanal.py
+# Cargar un archivo JSON de datos
+python upload/ssn-semanal.py data/Semana15.json
 
-# Cargar JSONs desde otra carpeta
-python upload/ssn-semanal.py --input carpeta_entrada/
+# Cargar y confirmar un archivo JSON de datos
+python upload/ssn-semanal.py --confirm-week data/Semana15.json
 
-# Modo debug (muestra más información mientras se ejecuta)
-python upload/ssn-semanal.py --debug
+# Consultar el estado de una semana específica
+python upload/ssn-semanal.py --query-week 2025-15
+
+# Corregir datos de una semana específica
+python upload/ssn-semanal.py --fix-week 2025-15
+
+# Especificar un archivo de configuración alternativo
+python upload/ssn-semanal.py --config otra-config.json data/Semana15.json
 ```
 
-Los dos scripts usan la configuración de sus respectivos archivos `config.json` y las credenciales del archivo `.env`.
+Los argumentos disponibles son:
+- `--config`: Ruta al archivo de configuración (opcional, por defecto usa `upload/config.json`)
+- `--confirm-week`: Confirma la entrega semanal y mueve el archivo a processed/
+- `--fix-week YYYY-WW`: Corrige los datos de una semana específica
+- `--query-week YYYY-WW`: Consulta el estado de una semana específica
+
+Los dos scripts usan la configuración de sus respectivos archivos `config.json` y las credenciales del archivo `.env`. Las credenciales requeridas son:
+- `SSN_USER`: Usuario para autenticación
+- `SSN_PASSWORD`: Contraseña del usuario
+- `SSN_COMPANY`: Código de la compañía
 
 ### Archivos de configuración
 
