@@ -1,7 +1,12 @@
 # Excluir archivos de credenciales y configuraciones sensibles
 *.json
-!data/*.json
+!extract/config.json
+!upload/config.json
 !docs/*.json
+
+# Asegurar que los archivos JSON de data y processed se excluyan
+data/**/*.json
+data/*.json
 
 # Archivos de configuración específicos del entorno
 .env
