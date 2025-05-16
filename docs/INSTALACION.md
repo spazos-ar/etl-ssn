@@ -41,7 +41,7 @@ pip --version
 
 ### 1. Clonar el Repositorio
 
-1. Abre PowerShell
+1. Abre PowerShell o CMD (ventana de comando)
 
 2. Crea y navega al directorio recomendado para proyectos (si no existe, los comandos lo crearán):
 ```powershell
