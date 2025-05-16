@@ -1,4 +1,10 @@
 {
   "retries": 1,
-  "debug": true
+  "debug": true,
+  "baseUrl": "https://testri.ssn.gob.ar/api/",
+  "endpoints": {
+    "login": "/login",
+    "entregaSemanal": "/inv/entregaSemanal",
+    "confirmarEntregaSemanal": "/inv/confirmarEntregaSemanal"
+  }
 }

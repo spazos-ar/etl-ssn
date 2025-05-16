@@ -70,14 +70,10 @@ set "FOUND=0"
 for %%f in ("!DATA_DIR!\Semana*.json") do (
     set /a "FOUND+=1"
     echo Procesando %%~nxf
-    python .\upload\ssn-semanal.py --config "!UPLOAD_CONFIG!" "%%f"
+    python .\upload\ssn-semanal.py --config "!UPLOAD_CONFIG!" --confirm-week "%%f"
     if !ERRORLEVEL! neq 0 (
         echo Error al procesar %%~nxf
         exit /b !ERRORLEVEL!
-    )
-    move "%%f" "!PROCESSED_DIR!\%%~nxf" >nul 2>&1
-    if !ERRORLEVEL! neq 0 (
-        echo Advertencia: No se pudo mover %%~nxf a !PROCESSED_DIR!
     )
 )
 

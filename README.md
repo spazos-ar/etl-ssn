@@ -73,10 +73,10 @@ Este script procesa los archivos Excel y genera los JSONs necesarios para la car
 
 ```powershell
 # Procesar un archivo Excel específico
-python extract/xls-semanal.py data/datos_semanales.xlsx
+python extract/xls-semanal.py --xls-path data/datos_semanales.xlsx
 
-# Elegir una carpeta de salida diferente (por defecto es data/)
-python extract/xls-semanal.py data/datos_semanales.xlsx --output carpeta_salida/
+# Procesar el archivo Excel especificando además la ruta del archivo de configuración
+python extract/xls-semanal.py --config extract/config.json --xls-path data/datos_semanales.xlsx
 ```
 
 #### Script de carga (`upload/ssn-semanal.py`)

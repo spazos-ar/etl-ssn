@@ -1,11 +1,55 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Script para procesar archivos Excel y generar JSONs para el sistema de la SSN.
+
+Este script procesa archivos Excel que contienen datos de operaciones semanales
+y los convierte al formato JSON requerido por la Superintendencia de Seguros
+de la Nación (SSN). Maneja cuatro tipos de operaciones:
+1. Compras
+2. Ventas
+3. Canjes
+4. Plazos Fijos
+
+El script realiza las siguientes tareas:
+- Lee archivos Excel con múltiples hojas
+- Procesa y valida los datos según los requerimientos de la SSN
+- Formatea fechas y números según las especificaciones
+- Genera archivos JSON por semana
+- Agrupa operaciones por cronograma semanal
+
+Uso:
+    python xls-semanal.py --xls-path EXCEL_FILE [--config CONFIG_FILE]
+
+Argumentos:
+    --xls-path: Ruta al archivo Excel a procesar
+    --config: Ruta al archivo de configuración (opcional)
+
+El archivo de configuración (config.json) debe contener:
+    {
+        "decimal_separator": separador decimal a usar ("." o ","),
+        "date_format": formato de fecha ("DDMMYYYY", "YYYYMMDD", "MMDDYYYY"),
+        "company": código de la compañía
+    }
+
+Estructura del Excel requerida:
+    - Hoja 'Compra': Operaciones de compra
+    - Hoja 'Venta': Operaciones de venta
+    - Hoja 'Canje': Operaciones de canje
+    - Hoja 'Plazo-Fijo': Operaciones de plazo fijo
+
+Autor: [Tu Nombre]
+Fecha: Mayo 2025
+"""
+
 import pandas as pd
-import json
-from datetime import datetime
 import os
+import json
 import re
-from collections import defaultdict
 import argparse
 import sys
+from datetime import datetime
+from collections import defaultdict
 
 def get_config_path():
     """Obtiene la ruta del archivo de configuración y el archivo Excel.
@@ -39,17 +83,21 @@ def load_config():
     return config
 
 def convert_excel_date(excel_number):
-    """Convierte un número de Excel a datetime.
+    """Convierte un número de fecha de Excel a objeto datetime.
     
     Args:
-        excel_number: Número que representa una fecha en Excel.
+        excel_number (int/float): Número que representa una fecha en Excel.
+            Excel usa un sistema donde las fechas son números secuenciales,
+            siendo 1 = 1/1/1900. Los decimales representan la hora del día.
         
     Returns:
-        datetime: Objeto datetime si la conversión es exitosa, None en caso contrario.
+        datetime: Objeto datetime si la conversión es exitosa
+        None: Si la entrada es inválida o la conversión falla
         
-    El número de Excel representa días desde el 1/1/1900, con algunas peculiaridades:
-    - Excel considera erróneamente que 1900 fue un año bisiesto
-    - Los números decimales representan fracciones de día
+    Notas:
+        - Excel tiene un error histórico donde considera 1900 como año bisiesto
+        - Los números < 60 representan fechas de enero y febrero de 1900
+        - Se resta 1 día para números >= 60 para compensar el error del año bisiesto
     """
     try:
         # Validar que es un número positivo
@@ -135,6 +183,21 @@ def convert_date_format(date_str, from_format, to_format):
         return None
 
 def format_number(number, decimal_separator='.', is_fc=False):
+    """Formatea números según los requerimientos de la SSN.
+    
+    Args:
+        number (int/float/str): Número a formatear
+        decimal_separator (str): Separador decimal a usar ('.' o ',')
+        is_fc (bool): Si es True, aplica reglas especiales para Fondos Comunes
+    
+    Returns:
+        str: Número formateado según las reglas:
+            - FC: 6 decimales, máx 14 dígitos enteros
+            - Otros: Sin decimales, máximo 14 dígitos
+        
+    Raises:
+        ValueError: Si el número excede los límites o el formato es inválido
+    """
     if pd.isna(number):
         return ""
     try:
@@ -185,18 +248,25 @@ def format_number(number, decimal_separator='.', is_fc=False):
         raise
 
 def format_date(date, date_format='DDMMYYYY'):
-    """Formatea una fecha al formato especificado.
+    """Formatea fechas al formato requerido por la SSN.
     
     Args:
-        date: Valor a formatear. Puede ser:
-            - datetime/Timestamp
+        date: Fecha a formatear. Puede ser:
+            - datetime/pd.Timestamp
             - número de Excel
             - string en formato DDMMYYYY/YYYYMMDD
             - None/NaT/NaN
-        date_format: Formato deseado ('DDMMYYYY', 'YYYYMMDD', 'MMDDYYYY')
-        
+        date_format (str): Formato deseado:
+            - 'DDMMYYYY': día/mes/año (por defecto)
+            - 'YYYYMMDD': año/mes/día
+            - 'MMDDYYYY': mes/día/año
+    
     Returns:
-        str: Fecha formateada o string vacío si la entrada es inválida
+        str: Fecha formateada en el formato especificado
+        str vacío: Si la entrada es None/NaT/NaN
+        
+    Raises:
+        ValueError: Si la fecha no se puede convertir al formato especificado
     """
     if pd.isna(date):
         return ""
@@ -281,6 +351,27 @@ def validate_date_format(date_str, expected_format):
     return bool(re.match(pattern, date_str))
 
 def process_compra(df, decimal_separator='.', date_format='DDMMYYYY'):
+    """Procesa operaciones de compra desde un DataFrame.
+    
+    Args:
+        df (pd.DataFrame): DataFrame con las operaciones de compra
+        decimal_separator (str): Separador decimal a usar
+        date_format (str): Formato para las fechas
+    
+    Returns:
+        list: Lista de diccionarios con las operaciones procesadas
+        
+    Cada registro incluye:
+        - TIPOOPERACION: Siempre "C" para compras
+        - TIPOESPECIE: Tipo de especie
+        - CODIGOESPECIE: Código de la especie
+        - CANTESPECIES: Cantidad (formato especial para FC)
+        - CODIGOAFECTACION: Código de afectación
+        - TIPOVALUACION: Tipo de valuación
+        - FECHAMOVIMIENTO: Fecha del movimiento
+        - PRECIOCOMPRA: Precio de compra
+        - FECHALIQUIDACION: Fecha de liquidación
+    """
     records = []
     for _, row in df.iterrows():
         is_fc = str(row['TIPOESPECIE']).strip() == 'FC'
@@ -300,6 +391,21 @@ def process_compra(df, decimal_separator='.', date_format='DDMMYYYY'):
     return records
 
 def process_venta(df, decimal_separator='.', date_format='DDMMYYYY'):
+    """Procesa operaciones de venta desde un DataFrame.
+    
+    Args:
+        df (pd.DataFrame): DataFrame con las operaciones de venta
+        decimal_separator (str): Separador decimal a usar
+        date_format (str): Formato para las fechas
+    
+    Returns:
+        list: Lista de diccionarios con las operaciones procesadas
+        
+    Cada registro incluye los campos de compra más:
+        - FECHAPASEVT: Fecha de pase (opcional)
+        - PRECIOPASEVT: Precio de pase (opcional)
+        - PRECIOVENTA: Precio de venta
+    """
     records = []
     for _, row in df.iterrows():
         is_fc = str(row['TIPOESPECIE']).strip() == 'FC'
@@ -321,6 +427,25 @@ def process_venta(df, decimal_separator='.', date_format='DDMMYYYY'):
     return records
 
 def process_canje(df, decimal_separator='.', date_format='DDMMYYYY'):
+    """Procesa operaciones de canje desde un DataFrame.
+    
+    Args:
+        df (pd.DataFrame): DataFrame con las operaciones de canje
+        decimal_separator (str): Separador decimal a usar
+        date_format (str): Formato para las fechas
+    
+    Returns:
+        list: Lista de diccionarios con las operaciones procesadas
+        
+    Cada registro incluye campos para ambas especies (A y B):
+        - TIPOESPECIEA/B: Tipo de especie
+        - CODIGOESPECIEA/B: Código de la especie
+        - CANTESPECIESA/B: Cantidad
+        - CODIGOAFECTACIONA/B: Código de afectación
+        - TIPOVALUACIONA/B: Tipo de valuación
+        - FECHAPASEVTA/B: Fecha de pase (opcional)
+        - PRECIOPASEVTA/B: Precio de pase (opcional)
+    """
     records = []
     for _, row in df.iterrows():
         is_fc_a = str(row['TIPOESPECIEA']).strip() == 'FC'
@@ -349,6 +474,32 @@ def process_canje(df, decimal_separator='.', date_format='DDMMYYYY'):
     return records
 
 def process_plazo_fijo(df, decimal_separator='.', date_format='DDMMYYYY'):
+    """Procesa operaciones de plazo fijo desde un DataFrame.
+    
+    Args:
+        df (pd.DataFrame): DataFrame con las operaciones de plazo fijo
+        decimal_separator (str): Separador decimal a usar
+        date_format (str): Formato para las fechas
+    
+    Returns:
+        list: Lista de diccionarios con las operaciones procesadas
+        
+    Cada registro incluye:
+        - TIPOOPERACION: Siempre "P" para plazos fijos
+        - TIPOPF: Tipo de plazo fijo
+        - BIC: Código BIC
+        - CDF: Código CDF
+        - FECHACONSTITUCION: Fecha de constitución
+        - FECHAVENCIMIENTO: Fecha de vencimiento
+        - MONEDA: Moneda del plazo fijo
+        - VALORNOMINALORIGEN: Valor nominal en origen
+        - VALORNOMINALNACIONAL: Valor nominal en moneda nacional
+        - CODIGOAFECTACION: Código de afectación
+        - TIPOTASA: Tipo de tasa
+        - TASA: Tasa de interés
+        - TITULODEUDA: Título de deuda (número entero)
+        - CODIGOTITULO: Código de título (opcional)
+    """
     records = []
     for _, row in df.iterrows():
         record = {
@@ -372,7 +523,20 @@ def process_plazo_fijo(df, decimal_separator='.', date_format='DDMMYYYY'):
     return records
 
 def agrupar_por_semana(operaciones):
-    """Agrupa las operaciones por semana y elimina el campo auxiliar __CRONOGRAMA."""
+    """Agrupa las operaciones por semana usando el campo __CRONOGRAMA.
+    
+    Args:
+        operaciones (list): Lista de diccionarios con las operaciones
+    
+    Returns:
+        dict: Diccionario donde:
+            - Claves: Cronogramas (formato YYYY-WW)
+            - Valores: Listas de operaciones de esa semana
+            
+    Notas:
+        - Elimina el campo auxiliar __CRONOGRAMA de cada operación
+        - Mantiene el orden original de las operaciones en cada semana
+    """
     operaciones_por_semana = defaultdict(list)
     
     for op in operaciones:
@@ -383,7 +547,23 @@ def agrupar_por_semana(operaciones):
     return dict(operaciones_por_semana)
 
 def guardar_json_por_semana(codigo_compania, operaciones_por_semana):
-    """Guarda un archivo JSON por cada semana encontrada."""
+    """Guarda archivos JSON separados para cada semana.
+    
+    Args:
+        codigo_compania (str): Código de la compañía para los JSONs
+        operaciones_por_semana (dict): Operaciones agrupadas por semana
+    
+    Returns:
+        list: Lista de tuplas (nombre_archivo, cantidad_operaciones)
+        
+    Formato del JSON generado:
+        {
+            "CODIGOCOMPANIA": str,
+            "TIPOENTREGA": "SEMANAL",
+            "CRONOGRAMA": "YYYY-WW",
+            "OPERACIONES": [...]
+        }
+    """
     archivos_generados = []
     
     for cronograma, operaciones in operaciones_por_semana.items():
@@ -432,7 +612,16 @@ def generate_empty_week_json(codigo_compania, cronograma):
     return output_filename
 
 def validate_week_format(week_str):
-    """Valida que el formato de semana sea YYYY-WW."""
+    """Valida que una cadena tenga formato de semana válido.
+    
+    Args:
+        week_str (str): Cadena a validar (formato esperado: YYYY-WW)
+    
+    Returns:
+        bool: True si el formato es válido y los valores son razonables:
+            - Año entre 2000 y 2100
+            - Semana entre 1 y 53
+    """
     if not re.match(r'^\d{4}-\d{2}$', week_str):
         return False
     
