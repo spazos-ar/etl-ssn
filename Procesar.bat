@@ -5,9 +5,10 @@ setlocal enabledelayedexpansion
 REM Mostrar ayuda si no hay argumentos
 if "%~1"=="" (
     echo Uso:
-    echo   Procesar.bat datos_semanales.xlsx        - Extraer datos
-    echo   Procesar.bat datos_semanales.xlsx full   - Extraer y enviar
-    echo   Procesar.bat upload                      - Solo enviar JSONs existentes
+    echo   Procesar.bat datos_semanales.xlsx         - Extraer datos
+    echo   Procesar.bat datos_semanales.xlsx full    - Extraer y enviar con confirmación
+    echo   Procesar.bat upload                       - Solo enviar JSONs existentes
+    echo   Procesar.bat query YYYY-WW                - Consultar estado de una semana
     exit /b 1
 )
 
@@ -20,68 +21,57 @@ set "DATA_DIR=.\data"
 REM Crear carpeta processed si no existe
 if not exist "!PROCESSED_DIR!" mkdir "!PROCESSED_DIR!"
 
-REM Configurar modo
-set "MODO=extract"
-if /i "%~1"=="upload" (
-    set "MODO=upload"
-    if not exist "!UPLOAD_CONFIG!" (
-        echo Error: No se encuentra el archivo de configuracion !UPLOAD_CONFIG!
+REM Procesar comandos especiales
+if "%~1"=="query" (
+    if "%~2"=="" (
+        echo Error: Debe especificar la semana en formato YYYY-WW
+        echo Ejemplo: Procesar.bat query 2025-15
         exit /b 1
     )
-    goto :upload
-)
-
-if /i "%~2"=="full" set "MODO=full"
-
-REM Verificar configuraciones para modos extract y full
-if not exist "!EXTRACT_CONFIG!" (
-    echo Error: No se encuentra el archivo de configuracion !EXTRACT_CONFIG!
-    exit /b 1
-)
-
-REM Determinar ruta del Excel eliminando .\data\ si existe en el parámetro
-set "EXCEL_NAME=%~1"
-set "EXCEL_NAME=!EXCEL_NAME:.\data\=!"
-set "EXCEL_FILE=!DATA_DIR!\!EXCEL_NAME!"
-
-if not exist "!EXCEL_FILE!" (
-    echo Error: No se encuentra el archivo Excel !EXCEL_FILE!
-    exit /b 1
-)
-
-echo Modo: !MODO!
-
-REM Extraer datos
-echo Extrayendo datos de !EXCEL_FILE!...
-python extract\xls-semanal.py --config "!EXTRACT_CONFIG!" --xls-path "!EXCEL_FILE!"
-if !ERRORLEVEL! neq 0 (
-    echo Error en extraccion
+    python .\upload\ssn-semanal.py --query-week %2
     exit /b !ERRORLEVEL!
 )
 
-if /i "!MODO!"=="extract" (
-    echo Extraccion completada
+REM Manejar caso de solo envío
+if "%~1"=="upload" (
+    for %%f in ("!DATA_DIR!\Semana*.json") do (
+        echo Procesando %%~nxf...
+        python .\upload\ssn-semanal.py --confirm-week "%%f"
+        if !ERRORLEVEL! neq 0 (
+            echo Error al procesar %%~nxf
+            exit /b !ERRORLEVEL!
+        )
+    )
+    echo Todos los archivos fueron procesados exitosamente
     exit /b 0
 )
 
-:upload
-echo Buscando archivos JSON en !DATA_DIR!...
-set "FOUND=0"
-for %%f in ("!DATA_DIR!\Semana*.json") do (
-    set /a "FOUND+=1"
-    echo Procesando %%~nxf
-    python .\upload\ssn-semanal.py --config "!UPLOAD_CONFIG!" --confirm-week "%%f"
+REM Procesar archivo Excel
+if exist "%~1" (
+    echo Extrayendo datos de %~1...
+    python .\extract\xls-semanal.py --config "!EXTRACT_CONFIG!" "%~1"
     if !ERRORLEVEL! neq 0 (
-        echo Error al procesar %%~nxf
+        echo Error al extraer datos
         exit /b !ERRORLEVEL!
     )
-)
-
-if !FOUND!==0 (
-    echo No se encontraron archivos JSON para procesar en !DATA_DIR!
-    dir "!DATA_DIR!\Semana*.json" 2>nul
+    
+    REM Si se especifica 'full', enviar y confirmar
+    if /i "%~2"=="full" (
+        echo Enviando datos a SSN...
+        for %%f in ("!DATA_DIR!\Semana*.json") do (
+            echo Procesando %%~nxf...
+            python .\upload\ssn-semanal.py --confirm-week "%%f"
+            if !ERRORLEVEL! neq 0 (
+                echo Error al procesar %%~nxf
+                exit /b !ERRORLEVEL!
+            )
+            move "%%f" "!PROCESSED_DIR!"
+        )
+        echo Procesamiento completo
+    ) else (
+        echo Extracción completa. Use 'Procesar.bat upload' para enviar los datos
+    )
+) else (
+    echo Error: No se encuentra el archivo %1
     exit /b 1
 )
-
-echo Proceso completado exitosamente
-exit /b 0

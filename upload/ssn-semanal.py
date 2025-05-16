@@ -52,48 +52,115 @@ import shutil
 from dotenv import load_dotenv
 from pathlib import Path
 from urllib.parse import urljoin
+import re
+import logging
 
 # Cargar variables de entorno desde el archivo .env en la raíz del proyecto
 env_path = Path(__file__).resolve().parents[1] / '.env'
 load_dotenv(dotenv_path=env_path)
 
 def get_config_path():
-    """Obtiene la ruta del archivo de configuración.
+    """Obtiene la ruta del archivo de configuración y procesa argumentos.
     
-    Busca primero en los argumentos de línea de comando,
-    si no encuentra usa el config.json en el directorio del script.
+    Returns:
+        tuple: (config_path, data_path, confirm_week, fix_week, query_week)
+            config_path: Ruta al archivo de configuración
+            data_path: Ruta al archivo de datos (None si se usa --fix-week o --query-week)
+            confirm_week: Bool indicando si se debe confirmar la semana
+            fix_week: String con la semana a corregir (formato YYYY-WW)
+            query_week: String con la semana a consultar (formato YYYY-WW)
     """
     parser = argparse.ArgumentParser(description='Envía datos semanales a la SSN')
     parser.add_argument('--config', help='Ruta al archivo de configuración')
-    parser.add_argument('--confirm-week', action='store_true', 
-                       help='Confirma la entrega semanal y mueve el archivo a processed/')
-    parser.add_argument('data_file', help='Archivo JSON con los datos a enviar')
+    
+    # Grupo mutuamente excluyente para los modos de operación
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--confirm-week', action='store_true', 
+                      help='Confirma la entrega semanal y mueve el archivo a processed/')
+    group.add_argument('--fix-week', metavar='YYYY-WW',
+                      help='Corrige una semana específica (formato YYYY-WW)')
+    group.add_argument('--query-week', metavar='YYYY-WW',
+                      help='Consulta el estado de una semana específica (formato YYYY-WW)')
+    
+    # El archivo de datos es obligatorio solo si no se usa --fix-week o --query-week
+    parser.add_argument('data_file', nargs='?', 
+                       help='Archivo JSON con los datos a enviar (no requerido con --fix-week o --query-week)')
+    
     args = parser.parse_args()
+    
+    # Validar combinación de argumentos
+    if args.fix_week or args.query_week:
+        if args.data_file:
+            parser.error("El argumento 'data_file' no debe especificarse cuando se usa --fix-week o --query-week")
+        # Validar formato de semana (YYYY-WW)
+        week_arg = args.fix_week or args.query_week
+        if not re.match(r'^\d{4}-\d{2}$', week_arg):
+            parser.error("El formato de semana debe ser YYYY-WW (ejemplo: 2025-33)")
+        año, semana = map(int, week_arg.split('-'))
+        if not (2000 <= año <= 2100 and 1 <= semana <= 53):
+            parser.error("Valores inválidos. El año debe estar entre 2000 y 2100, y la semana entre 1 y 53")
+    elif not args.data_file:
+        parser.error("Se requiere el archivo de datos cuando no se usa --fix-week o --query-week")
     
     if args.config:
         if not os.path.isfile(args.config):
             raise FileNotFoundError(f"El archivo de configuración '{args.config}' no existe.")
-        return args.config, args.data_file, args.confirm_week
-        
-    # Si no se especifica, usar el config.json en el directorio del script
-    default_config = os.path.join(os.path.dirname(__file__), 'config.json')
-    if not os.path.isfile(default_config):
-        raise FileNotFoundError(f"No se encuentra el archivo de configuración por defecto en '{default_config}'")
-    return default_config, args.data_file, args.confirm_week
+        config_path = args.config
+    else:
+        # Si no se especifica, usar el config.json en el directorio del script
+        config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+        if not os.path.isfile(config_path):
+            raise FileNotFoundError(f"No se encuentra el archivo de configuración por defecto en '{config_path}'")
+    
+    return config_path, args.data_file, args.confirm_week, args.fix_week, args.query_week
 
-def build_url(config, endpoint):
-    """Construye una URL completa asegurándose que la concatenación sea correcta.
+def load_config(config_path):
+    """Carga la configuración desde un archivo JSON.
     
     Args:
-        config: Diccionario con la configuración que contiene baseUrl y endpoints
-        endpoint: Nombre del endpoint en la configuración
+        config_path (str): Ruta al archivo de configuración
+    
+    Returns:
+        dict: Configuración cargada
+    """
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    
+    # Validar configuración mínima requerida
+    required_fields = ['baseUrl', 'endpoints']
+    missing_fields = [field for field in required_fields if field not in config]
+    if missing_fields:
+        raise ValueError(f"Campos requeridos faltantes en config.json: {', '.join(missing_fields)}")
+    
+    return config
+
+def setup_logging(debug_mode):
+    """Configura el sistema de logging.
+    
+    Args:
+        debug_mode (bool): Si True, establece el nivel de logging a DEBUG
+    """
+    level = logging.DEBUG if debug_mode else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+def build_url(config, endpoint):
+    """Construye una URL completa para un endpoint.
+    
+    Args:
+        config (dict): Configuración cargada del archivo JSON
+        endpoint (str): Nombre del endpoint en la configuración
+    
     Returns:
         str: URL completa
     """
-    base_url = config["baseUrl"]
-    if not base_url.endswith('/'):
-        base_url += '/'
-    return urljoin(base_url, config["endpoints"][endpoint].lstrip('/'))
+    if endpoint not in config['endpoints']:
+        raise ValueError(f"Endpoint '{endpoint}' no encontrado en la configuración")
+    
+    return config['baseUrl'].rstrip('/') + config['endpoints'][endpoint]
 
 def authenticate(config, debug_enabled):
     """
@@ -241,68 +308,202 @@ def mover_archivo_procesado(data_file):
         print(f"Error al mover el archivo: {str(e)}", file=sys.stderr)
         raise
 
-def main():
-    try:
-        config_path, data_path, confirm_week = get_config_path()
-    except FileNotFoundError as e:
-        print(e, file=sys.stderr)
-        sys.exit(1)
-
-    if not os.path.isfile(data_path):
-        print(f"Error: El archivo de datos '{data_path}' no existe.", file=sys.stderr)
-        sys.exit(1)
-
-    # Cargar la configuración operativa
-    with open(config_path, 'r') as config_file:
-        config = json.load(config_file)
-        
-    # Validar la configuración
-    required_config = ["baseUrl", "endpoints"]
-    required_endpoints = ["login", "entregaSemanal", "confirmarEntregaSemanal"]
+def fix_semana(token, company, cronograma, attempt, debug_enabled, config):
+    """Envía una corrección para una semana específica.
     
-    if not all(key in config for key in required_config):
-        raise ValueError(f"Faltan campos requeridos en la configuración: {', '.join(required_config)}")
-    if not all(key in config["endpoints"] for key in required_endpoints):
-        raise ValueError(f"Faltan endpoints requeridos en la configuración: {', '.join(required_endpoints)}")
+    Args:
+        token: Token de autenticación
+        company: Código de la compañía
+        cronograma: Semana a corregir (formato YYYY-WW)
+        attempt: Número de intento actual
+        debug_enabled: Si está en modo debug
+        config: Configuración del script
+    
+    Raises:
+        RuntimeError: Si hay un error al procesar la solicitud
+    """
+    url = build_url(config, "entregaSemanal")
+    headers = {
+        "Content-Type": "application/json",
+        "Token": token
+    }
 
-    with open(data_path, 'r') as data_file:
-        data = json.load(data_file)
+    payload = {
+        "CODIGOCOMPANIA": company,
+        "TIPOENTREGA": "SEMANAL",
+        "CRONOGRAMA": cronograma
+    }
 
-    cronograma = data.get("CRONOGRAMA", "")
-    if not cronograma:
-        raise ValueError("El campo 'CRONOGRAMA' está vacío o no existe en el archivo JSON.")
+    if debug_enabled and attempt == 1:
+        print("DEBUG: JSON de corrección de semana:\n\r", json.dumps(payload, indent=2))
 
-    token = authenticate(config, config.get("debug", False))
-    company = os.getenv('SSN_COMPANY')
-    retries = config.get("retries", 4)
-    debug_enabled = config.get("debug", False)
+    response = requests.post(url, json=payload, headers=headers)
+    
+    # Procesar respuesta
+    try:
+        response_json = response.json()
+    except Exception:
+        response_json = {}
 
-    # Proceso de envío y confirmación
-    for attempt in range(1, retries + 1):
+    # En caso de éxito
+    if response.status_code == 200:
+        print(f"Semana {cronograma} corregida exitosamente.")
+        return True
+        
+    # En caso de error
+    error_message = (
+        response_json.get("message") or  # Mensaje de error principal
+        response_json.get("detail") or   # Detalle del error
+        response_json.get("errors") or   # Lista de errores
+        response.text                    # Respuesta cruda como último recurso
+    )
+    
+    # Si el error_message es una lista o diccionario, convertirlo a string
+    if not isinstance(error_message, str):
+        error_message = json.dumps(error_message, indent=2, ensure_ascii=False)
+    
+    # En modo debug, mostrar la respuesta completa
+    if debug_enabled and attempt == 1:
+        print("DEBUG: Respuesta del servidor:\n\r", response.text)
+    
+    # Manejar códigos de error específicos
+    if response.status_code == 409:
+        raise RuntimeError(error_message)
+    elif response.status_code == 401:
+        raise RuntimeError("Error de autenticación. Verifique sus credenciales.")
+    elif response.status_code == 403:
+        raise RuntimeError("No tiene permisos para realizar esta operación.")
+    else:
+        raise RuntimeError(f"Error al corregir semana: {error_message}")
+
+def query_semana(token, company, cronograma, attempt, debug_enabled, config):
+    """Consulta el estado de una semana específica.
+    
+    Args:
+        token: Token de autenticación
+        company: Código de la compañía
+        cronograma: Semana a consultar (formato YYYY-WW)
+        attempt: Número de intento actual
+        debug_enabled: Si está en modo debug
+        config: Configuración del script
+    """
+    url = build_url(config, "entregaSemanal")
+    headers = {
+        "Content-Type": "application/json",
+        "Token": token
+    }    # Construir query params usando camelCase como especifica la documentación
+    params = {
+        "codigoCompania": company,
+        "tipoEntrega": "SEMANAL",
+        "cronograma": cronograma
+    }
+
+    if debug_enabled and attempt == 1:
+        print("DEBUG: Consultando semana con parámetros:\n\r", json.dumps(params, indent=2))
+
+    response = requests.get(url, params=params, headers=headers)
+    if response.status_code == 200:
         try:
-            # Enviar entrega
-            enviar_entrega(token, company, data.get("OPERACIONES", []), cronograma, attempt, debug_enabled, config)
-            print("Entrega completada exitosamente.")
+            data = response.json()
+            print(f"Estado de la semana {cronograma}:")
+            print(json.dumps(data, indent=2, ensure_ascii=False))
+            return True
+        except json.JSONDecodeError:
+            print(f"La respuesta no es un JSON válido: {response.text}")
+            raise RuntimeError("Error al procesar la respuesta del servidor")
+    else:
+        try:
+            response_json = response.json()
+            error_details = (
+                response_json.get("errors") or
+                response_json.get("message") or
+                response_json.get("detail") or
+                response.text
+            )
+            error_message = error_details if isinstance(error_details, str) else json.dumps(error_details, indent=2)
+        except Exception as e:
+            error_message = f"No se pudo procesar la respuesta del servidor: {str(e)}\nRespuesta completa: {response.text}"
+        
+        if attempt == 1:
+            print("DEBUG: Respuesta del servidor:\n\r", response.text)
+        raise RuntimeError(f"Error al consultar semana: {response.status_code} - {error_message}")
 
-            # Si se solicitó confirmar la entrega
-            if confirm_week:
-                try:
-                    # Confirmar entrega
-                    confirmar_entrega(token, company, cronograma, attempt, debug_enabled, config)
-                    # Mover archivo a processed/
-                    mover_archivo_procesado(data_path)
-                except Exception as e:
-                    print(f"Error en el proceso de confirmación: {str(e)}", file=sys.stderr)
-                    if attempt == retries:
-                        sys.exit(1)
-                    continue
+def load_data(data_file):
+    """Carga los datos desde un archivo JSON.
+    
+    Args:
+        data_file (str): Ruta al archivo de datos
+    
+    Returns:
+        dict: Datos cargados del archivo
+    
+    Raises:
+        FileNotFoundError: Si el archivo no existe
+        json.JSONDecodeError: Si el archivo no es un JSON válido
+        ValueError: Si faltan campos requeridos en los datos
+    """
+    if not os.path.isfile(data_file):
+        raise FileNotFoundError(f"No se encuentra el archivo de datos: {data_file}")
+    
+    with open(data_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    # Validar estructura mínima requerida
+    if not isinstance(data, dict):
+        raise ValueError("El archivo debe contener un objeto JSON")
+    
+    required_fields = ['CRONOGRAMA', 'OPERACIONES']
+    missing_fields = [field for field in required_fields if field not in data]
+    if missing_fields:
+        raise ValueError(f"Campos requeridos faltantes en el archivo de datos: {', '.join(missing_fields)}")
+    
+    return data
+
+def main():
+    """Función principal del script."""
+    try:
+        config_path, data_file, confirm_week, fix_week, query_week = get_config_path()
+        config = load_config(config_path)
+        
+        # Configurar logging
+        setup_logging(config.get('debug', False))
+        
+        # Iniciar sesión
+        session = requests.Session()
+        token = authenticate(config, config.get('debug', False))
+        session.headers['Authorization'] = f"Bearer {token}"
+        
+        if query_week:
+            # Modo consulta: obtener estado de una semana específica
+            query_semana(token, os.getenv('SSN_COMPANY'), query_week, 1, config.get('debug', False), config)
+        elif fix_week:
+            # Modo corrección: reenviar datos de una semana específica
+            fix_semana(token, os.getenv('SSN_COMPANY'), fix_week, 1, config.get('debug', False), config)
+        else:
+            # Modo normal: procesar archivo de datos y opcionalmente confirmar
+            data = load_data(data_file)
+            cronograma = data.get('CRONOGRAMA')
+            records = data.get('OPERACIONES', [])
             
-            break
-        except RuntimeError as e:
-            print(f"Intento {attempt}/{retries} fallido: {e}", file=sys.stderr)
-            if attempt == retries:
-                print("El proceso falló después de todos los reintentos. Por favor, revise los detalles del error.", file=sys.stderr)
-                sys.exit(1)
+            # Procesar la semana
+            enviar_entrega(token, os.getenv('SSN_COMPANY'), records, cronograma, 1, config.get('debug', False), config)
+            
+            if confirm_week:
+                confirmar_entrega(token, os.getenv('SSN_COMPANY'), cronograma, 1, config.get('debug', False), config)
+                mover_archivo_procesado(data_file)
+        
+    except (requests.exceptions.HTTPError, RuntimeError) as e:
+        # Errores esperados del API o de validación
+        print(f"\nError: {str(e)}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        # Errores inesperados
+        if config.get('debug', False):
+            logging.exception("Error inesperado:")
+        else:
+            print(f"\nError inesperado: {str(e)}", file=sys.stderr)
+            print("Use --config con debug=true para más detalles", file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
