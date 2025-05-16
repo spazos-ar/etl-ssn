@@ -4,12 +4,39 @@ from datetime import datetime
 import os
 import re
 from collections import defaultdict
-import argparse  # Agregar import para manejo de argumentos
+import argparse
+import sys
+
+def get_config_path():
+    """Obtiene la ruta del archivo de configuración y el archivo Excel.
+    
+    Busca primero en los argumentos de línea de comando, 
+    si no encuentra usa el config.json en el directorio del script.
+    """
+    parser = argparse.ArgumentParser(description='Procesa archivo Excel con datos semanales')
+    parser.add_argument('--config', help='Ruta al archivo de configuración')
+    parser.add_argument('--xls-path', help='Ruta al archivo Excel a procesar', required=True)
+    args = parser.parse_args()
+    
+    if args.config:
+        if not os.path.isfile(args.config):
+            raise FileNotFoundError(f"El archivo de configuración '{args.config}' no existe.")
+        config_path = args.config
+    else:
+        # Si no se especifica, usar el config.json en el directorio del script
+        config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+        if not os.path.isfile(config_path):
+            raise FileNotFoundError(f"No se encuentra el archivo de configuración por defecto en '{config_path}'")
+    
+    return config_path, args.xls_path
 
 def load_config():
-    config_path = os.path.join('extract', 'config_xls.json')
+    config_path, xls_path = get_config_path()
     with open(config_path, 'r') as f:
-        return json.load(f)
+        config = json.load(f)
+    # Sobreescribir xls_path con el valor de línea de comando
+    config['xls_path'] = xls_path
+    return config
 
 def convert_excel_date(excel_number):
     """Convierte un número de Excel a datetime.
@@ -107,22 +134,31 @@ def convert_date_format(date_str, from_format, to_format):
     except (ValueError, IndexError, TypeError):
         return None
 
-def format_number(number, decimal_separator='.'):
+def format_number(number, decimal_separator='.', is_fc=False):
     if pd.isna(number):
-        return 0.0
+        return ""
     try:
-        # Si es un número, convertirlo directamente
-        if isinstance(number, (int, float)):
-            return float(number)
-        
-        # Si es string, asegurar que usamos punto como separador decimal para float()
+        # Convertir a número
         if isinstance(number, str):
-            # Limpiar el string de espacios
             number = number.strip()
-            
-            # Detectar el separador decimal usado en el número
-            has_comma = ',' in number
-            has_point = '.' in number
+            if ',' in number and decimal_separator == '.':
+                number = number.replace(',', '.')
+            elif '.' in number and decimal_separator == ',':
+                number = number.replace('.', ',')
+        
+        # Convertir a float
+        value = float(str(number).replace(',', '.'))
+        
+        if is_fc:
+            # Para FC, formato con 6 decimales
+            if abs(value) > 99999999999999.999999:  # 14 dígitos enteros + 6 decimales
+                raise ValueError(f"Valor {value} excede el límite de 14 dígitos enteros y 6 decimales")
+            return f"{value:.6f}".replace('.', decimal_separator)
+        else:
+            # Para otros tipos, formato entero
+            if abs(value) > 99999999999999:  # 14 dígitos enteros
+                raise ValueError(f"Valor {value} excede el límite de 14 dígitos enteros")
+            return str(int(round(value)))  # Redondear y convertir a entero
             
             # Si el número usa un separador diferente al configurado, sugerir cambio
             if has_comma and decimal_separator == '.':
@@ -247,17 +283,18 @@ def validate_date_format(date_str, expected_format):
 def process_compra(df, decimal_separator='.', date_format='DDMMYYYY'):
     records = []
     for _, row in df.iterrows():
+        is_fc = str(row['TIPOESPECIE']).strip() == 'FC'
         record = {
             "TIPOOPERACION": "C",
             "TIPOESPECIE": str(row['TIPOESPECIE']),
             "CODIGOESPECIE": str(row['CODIGOESPECIE']),
-            "CANTESPECIES": format_number(row['CANTESPECIES'], decimal_separator),
+            "CANTESPECIES": format_number(row['CANTESPECIES'], decimal_separator, is_fc),
             "CODIGOAFECTACION": str(row['CODIGOAFECTACION']),
             "TIPOVALUACION": str(row['TIPOVALUACION']),
             "FECHAMOVIMIENTO": format_date(row['FECHAMOVIMIENTO'], date_format),
             "PRECIOCOMPRA": format_number(row['PRECIOCOMPRA'], decimal_separator),
             "FECHALIQUIDACION": format_date(row['FECHALIQUIDACION'], date_format),
-            "__CRONOGRAMA": str(row['CRONOGRAMA'])  # Campo auxiliar para agrupar por semana
+            "__CRONOGRAMA": str(row['CRONOGRAMA'])
         }
         records.append(record)
     return records
@@ -265,19 +302,20 @@ def process_compra(df, decimal_separator='.', date_format='DDMMYYYY'):
 def process_venta(df, decimal_separator='.', date_format='DDMMYYYY'):
     records = []
     for _, row in df.iterrows():
+        is_fc = str(row['TIPOESPECIE']).strip() == 'FC'
         record = {
             "TIPOOPERACION": "V",
             "TIPOESPECIE": str(row['TIPOESPECIE']),
             "CODIGOESPECIE": str(row['CODIGOESPECIE']),
-            "CANTESPECIES": format_number(row['CANTESPECIES'], decimal_separator),
+            "CANTESPECIES": format_number(row['CANTESPECIES'], decimal_separator, is_fc),
             "CODIGOAFECTACION": str(row['CODIGOAFECTACION']),
             "TIPOVALUACION": str(row['TIPOVALUACION']),
             "FECHAMOVIMIENTO": format_date(row['FECHAMOVIMIENTO'], date_format),
             "FECHAPASEVT": format_date(row['FECHAPASEVT'], date_format) if 'FECHAPASEVT' in row else "",
-            "PRECIOPASEVT": str(row['PRECIOPASEVT']) if 'PRECIOPASEVT' in row else "",
+            "PRECIOPASEVT": format_date(row['PRECIOPASEVT']) if 'PRECIOPASEVT' in row else "",
             "FECHALIQUIDACION": format_date(row['FECHALIQUIDACION'], date_format),
             "PRECIOVENTA": format_number(row['PRECIOVENTA'], decimal_separator),
-            "__CRONOGRAMA": str(row['CRONOGRAMA'])  # Campo auxiliar para agrupar por semana
+            "__CRONOGRAMA": str(row['CRONOGRAMA'])
         }
         records.append(record)
     return records
@@ -285,25 +323,27 @@ def process_venta(df, decimal_separator='.', date_format='DDMMYYYY'):
 def process_canje(df, decimal_separator='.', date_format='DDMMYYYY'):
     records = []
     for _, row in df.iterrows():
+        is_fc_a = str(row['TIPOESPECIEA']).strip() == 'FC'
+        is_fc_b = str(row['TIPOESPECIEB']).strip() == 'FC'
         record = {
             "TIPOOPERACION": "J",
             "TIPOESPECIEA": str(row['TIPOESPECIEA']),
             "CODIGOESPECIEA": str(row['CODIGOESPECIEA']),
-            "CANTESPECIESA": format_number(row['CANTESPECIESA'], decimal_separator),
+            "CANTESPECIESA": format_number(row['CANTESPECIESA'], decimal_separator, is_fc_a),
             "CODIGOAFECTACIONA": str(row['CODIGOAFECTACIONA']),
             "TIPOVALUACIONA": str(row['TIPOVALUACIONA']),
             "FECHAPASEVTA": format_date(row['FECHAPASEVTA'], date_format) if 'FECHAPASEVTA' in row else "",
-            "PRECIOPASEVTA": str(row['PRECIOPASEVTA']) if 'PRECIOPASEVTA' in row else "",
+            "PRECIOPASEVTA": format_date(row['PRECIOPASEVTA']) if 'PRECIOPASEVTA' in row else "",
             "TIPOESPECIEB": str(row['TIPOESPECIEB']),
             "CODIGOESPECIEB": str(row['CODIGOESPECIEB']),
-            "CANTESPECIESB": format_number(row['CANTESPECIESB'], decimal_separator),
+            "CANTESPECIESB": format_number(row['CANTESPECIESB'], decimal_separator, is_fc_b),
             "CODIGOAFECTACIONB": str(row['CODIGOAFECTACIONB']),
             "TIPOVALUACIONB": str(row['TIPOVALUACIONB']),
             "FECHAPASEVTB": format_date(row['FECHAPASEVTB'], date_format) if 'FECHAPASEVTB' in row else "",
-            "PRECIOPASEVTB": str(row['PRECIOPASEVTB']) if 'PRECIOPASEVTB' in row else "",
+            "PRECIOPASEVTB": format_date(row['PRECIOPASEVTB']) if 'PRECIOPASEVTB' in row else "",
             "FECHAMOVIMIENTO": format_date(row['FECHAMOVIMIENTO'], date_format),
             "FECHALIQUIDACION": format_date(row['FECHALIQUIDACION'], date_format),
-            "__CRONOGRAMA": str(row['CRONOGRAMA'])  # Campo auxiliar para agrupar por semana
+            "__CRONOGRAMA": str(row['CRONOGRAMA'])
         }
         records.append(record)
     return records
@@ -404,172 +444,49 @@ def validate_week_format(week_str):
 
 def main():
     try:
-        # Configurar parser de argumentos
-        parser = argparse.ArgumentParser(description='Procesa archivo Excel con operaciones semanales.')
-        parser.add_argument('--xls-path', type=str, help='Ruta al archivo Excel a procesar')
-        parser.add_argument('--empty-week', type=str, help='Genera un JSON vacío para la semana especificada (formato YYYY-WW)')
-        args = parser.parse_args()
-
         # Cargar configuración
         config = load_config()
-        codigo_compania = config['company']
-
-        # Si se especificó --empty-week, generar JSON vacío y terminar
-        if args.empty_week:
-            if not validate_week_format(args.empty_week):
-                print("\nError: El formato de semana debe ser YYYY-WW (ejemplo: 2025-18)")
-                return
-            
-            output_file = generate_empty_week_json(codigo_compania, args.empty_week)
-            print(f"\nArchivo JSON generado exitosamente: {output_file}")
-            return
-
-        # Proceder con el procesamiento normal del Excel
-        # Obtener configuración de formato
+        
+        # Procesar configuración
         decimal_separator = config.get('decimal_separator', '.')
         date_format = config.get('date_format', 'DDMMYYYY')
+        xls_path = config.get('xls_path')
+        company = config.get('company')
         
-        # Determinar ruta del archivo Excel (prioridad al argumento de línea de comando)
-        excel_path = args.xls_path if args.xls_path else config.get('xls_path', os.path.join('data', 'datos_semanales.xlsx'))
-        
-        print(f"\nUsando configuración:")
-        print(f"- Código de compañía: {config['company']}")
-        print(f"- Separador decimal: {decimal_separator}")
-        print(f"- Formato de fecha: {date_format}")
-        print(f"- Archivo Excel: {excel_path}")
-          # Verificar que el archivo existe
-        if not os.path.isfile(excel_path):
-            # Construir mensaje de error detallado
-            mensaje_error = f"\nNo se encontró el archivo Excel: {excel_path}\n"
-            mensaje_error += "\nPosibles soluciones:"
+        if not all([xls_path, company]):
+            raise ValueError("Faltan parámetros obligatorios en la configuración (xls_path, company)")
             
-            if args.xls_path:
-                mensaje_error += f"\n1. Verifique que la ruta proporcionada sea correcta: {args.xls_path}"
-                mensaje_error += "\n2. Use una ruta absoluta o relativa al directorio actual"
-            else:
-                mensaje_error += f"\n1. Verifique que el archivo exista en la ruta configurada en 'extract/config_xls.json'"
-                mensaje_error += f"\n2. Modifique el valor de 'xls_path' en el archivo de configuración"
-                mensaje_error += f"\n3. Especifique la ruta correcta usando el parámetro --xls-path"
+        # Verificar que el archivo Excel existe
+        if not os.path.isfile(xls_path):
+            raise FileNotFoundError(f"No se encuentra el archivo Excel en '{xls_path}'")
             
-            mensaje_error += "\n\nEjemplos de uso:"
-            mensaje_error += "\n- Usando configuración:"
-            mensaje_error += '\n  > python .\\extract\\xls-semanal.py'
-            mensaje_error += "\n- Especificando ruta:"
-            mensaje_error += '\n  > python .\\extract\\xls-semanal.py --xls-path "data\\datos_semanales.xlsx"'
-            
-            raise FileNotFoundError(mensaje_error)
-        
-        # Leer cada hoja del Excel, manejando hojas faltantes o vacías
-        try:
-            compra_df = pd.read_excel(excel_path, sheet_name='Compra', parse_dates=False, skiprows=None)
-        except ValueError:
-            print("- Advertencia: No se encontró la hoja 'Compra'")
-            compra_df = pd.DataFrame()
-            
-        try:
-            venta_df = pd.read_excel(excel_path, sheet_name='Venta', parse_dates=False, skiprows=None)
-        except ValueError:
-            print("- Advertencia: No se encontró la hoja 'Venta'")
-            venta_df = pd.DataFrame()
-            
-        try:
-            canje_df = pd.read_excel(excel_path, sheet_name='Canje', parse_dates=False, skiprows=None)
-        except ValueError:
-            print("- Advertencia: No se encontró la hoja 'Canje'")
-            canje_df = pd.DataFrame()
-            
-        try:
-            plazo_fijo_df = pd.read_excel(excel_path, sheet_name='Plazo-Fijo', parse_dates=False, skiprows=None)
-        except ValueError:
-            print("- Advertencia: No se encontró la hoja 'Plazo-Fijo'")
-            plazo_fijo_df = pd.DataFrame()
-        
-        # Verificar si hay al menos una hoja con datos
-        if compra_df.empty and venta_df.empty and canje_df.empty and plazo_fijo_df.empty:
-            raise ValueError("No se encontraron datos en ninguna de las hojas del Excel")
-        
-        # Imprimir información de registros leídos
-        print(f"\nRegistros leídos:")
-        print(f"- Compra: {len(compra_df)} registros")
-        print(f"- Venta: {len(venta_df)} registros")
-        print(f"- Canje: {len(canje_df)} registros")
-        print(f"- Plazo Fijo: {len(plazo_fijo_df)} registros")
-        
-        # Obtener información de la compañía
-        codigo_compania = config['company']
+        # Leer las hojas del Excel
+        df_compra = pd.read_excel(xls_path, sheet_name='Compra')
+        df_venta = pd.read_excel(xls_path, sheet_name='Venta')
+        df_canje = pd.read_excel(xls_path, sheet_name='Canje')
+        df_plazo = pd.read_excel(xls_path, sheet_name='Plazo-Fijo')
         
         # Procesar cada tipo de operación
         operaciones = []
+        operaciones.extend(process_compra(df_compra, decimal_separator, date_format))
+        operaciones.extend(process_venta(df_venta, decimal_separator, date_format))
+        operaciones.extend(process_canje(df_canje, decimal_separator, date_format))
+        operaciones.extend(process_plazo_fijo(df_plazo, decimal_separator, date_format))
         
-        # Procesar y verificar cada tipo de operación con los formatos configurados
-        if not compra_df.empty:
-            compras = process_compra(compra_df, decimal_separator, date_format)
-            print(f"\nOperaciones procesadas:")
-            print(f"- Compra: {len(compras)} operaciones")
-            if compras:
-                fecha = compras[0]['FECHAMOVIMIENTO']
-                if not validate_date_format(fecha, date_format):
-                    raise ValueError(f"Fecha '{fecha}' no está en el formato configurado {date_format}")
-                print(f"  Ejemplo fecha: {fecha}")
-            operaciones.extend(compras)
-        
-        if not venta_df.empty:
-            ventas = process_venta(venta_df, decimal_separator, date_format)
-            print(f"- Venta: {len(ventas)} operaciones")
-            if ventas:
-                fecha = ventas[0]['FECHAMOVIMIENTO']
-                if not validate_date_format(fecha, date_format):
-                    raise ValueError(f"Fecha '{fecha}' no está en el formato configurado {date_format}")
-                print(f"  Ejemplo fecha: {fecha}")
-            operaciones.extend(ventas)
-        
-        if not canje_df.empty:
-            canjes = process_canje(canje_df, decimal_separator, date_format)
-            print(f"- Canje: {len(canjes)} operaciones")
-            if canjes:
-                fecha = canjes[0]['FECHAMOVIMIENTO']
-                if not validate_date_format(fecha, date_format):
-                    raise ValueError(f"Fecha '{fecha}' no está en el formato configurado {date_format}")
-                print(f"  Ejemplo fecha: {fecha}")
-            operaciones.extend(canjes)
-        
-        if not plazo_fijo_df.empty:
-            plazos_fijos = process_plazo_fijo(plazo_fijo_df, decimal_separator, date_format)
-            print(f"- Plazo Fijo: {len(plazos_fijos)} operaciones")
-            if plazos_fijos:
-                fecha = plazos_fijos[0]['FECHACONSTITUCION']
-                if not validate_date_format(fecha, date_format):
-                    raise ValueError(f"Fecha '{fecha}' no está en el formato configurado {date_format}")
-                print(f"  Ejemplo fecha: {fecha}")
-            operaciones.extend(plazos_fijos)
-        
-        print(f"\nTotal de operaciones procesadas: {len(operaciones)}")
-        
-        # Agrupar operaciones por semana
+        # Agrupar por semana y generar JSONs
         operaciones_por_semana = agrupar_por_semana(operaciones)
+        archivos = guardar_json_por_semana(company, operaciones_por_semana)
         
-        # Guardar un archivo JSON por cada semana
-        archivos_generados = guardar_json_por_semana(codigo_compania, operaciones_por_semana)
-        
-        # Mostrar resumen de archivos generados
-        print("\nArchivos JSON generados:")
-        for archivo, total_operaciones in archivos_generados:
-            print(f"- {archivo}: {total_operaciones} operaciones")
-        
-    except ValueError as e:
-        print("\nError de formato en el archivo Excel:")
-        print(str(e))
-        return
+        # Informar resultado
+        for archivo, cantidad in archivos:
+            print(f"Generado {archivo} con {cantidad} operaciones")
+            
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Error: {str(e)}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
-        print(f"\nError inesperado al procesar el archivo Excel:")
-        print(str(e))
-        raise
+        print(f"Error inesperado: {str(e)}", file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == "__main__":
-    try:
-        main()
-    except FileNotFoundError as e:
-        print(str(e))
-    except Exception as e:
-        print(f"\nError inesperado al procesar el archivo Excel:")
-        print(str(e))
+    main()

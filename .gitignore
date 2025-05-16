@@ -4,7 +4,8 @@
 !docs/*.json
 
 # Archivos de configuración específicos del entorno
-*.env
+.env
+!.env.example
 *.ini
 
 # Archivos de caché de Python
