@@ -63,12 +63,13 @@ def get_config_path():
     """Obtiene la ruta del archivo de configuración y procesa argumentos.
     
     Returns:
-        tuple: (config_path, data_path, confirm_week, fix_week, query_week)
+        tuple: (config_path, data_path, confirm_week, fix_week, query_week, empty_week)
             config_path: Ruta al archivo de configuración
-            data_path: Ruta al archivo de datos (None si se usa --fix-week o --query-week)
+            data_path: Ruta al archivo de datos (None si se usa --fix-week o --query-week o --empty-week)
             confirm_week: Bool indicando si se debe confirmar la semana
             fix_week: String con la semana a corregir (formato YYYY-WW)
             query_week: String con la semana a consultar (formato YYYY-WW)
+            empty_week: String con la semana a enviar vacía (formato YYYY-WW)
     """
     parser = argparse.ArgumentParser(description='Envía datos semanales a la SSN')
     parser.add_argument('--config', help='Ruta al archivo de configuración')
@@ -81,26 +82,28 @@ def get_config_path():
                       help='Corrige una semana específica (formato YYYY-WW)')
     group.add_argument('--query-week', metavar='YYYY-WW',
                       help='Consulta el estado de una semana específica (formato YYYY-WW)')
+    group.add_argument('--empty-week', metavar='YYYY-WW',
+                      help='Envía una semana vacía sin operaciones (formato YYYY-WW)')
     
-    # El archivo de datos es obligatorio solo si no se usa --fix-week o --query-week
+    # El archivo de datos es obligatorio solo si no se usa --fix-week o --query-week o --empty-week
     parser.add_argument('data_file', nargs='?', 
-                       help='Archivo JSON con los datos a enviar (no requerido con --fix-week o --query-week)')
+                       help='Archivo JSON con los datos a enviar (no requerido con --fix-week, --query-week o --empty-week)')
     
     args = parser.parse_args()
     
     # Validar combinación de argumentos
-    if args.fix_week or args.query_week:
+    if args.fix_week or args.query_week or args.empty_week:
         if args.data_file:
-            parser.error("El argumento 'data_file' no debe especificarse cuando se usa --fix-week o --query-week")
+            parser.error("El argumento 'data_file' no debe especificarse cuando se usa --fix-week, --query-week o --empty-week")
         # Validar formato de semana (YYYY-WW)
-        week_arg = args.fix_week or args.query_week
+        week_arg = args.fix_week or args.query_week or args.empty_week
         if not re.match(r'^\d{4}-\d{2}$', week_arg):
             parser.error("El formato de semana debe ser YYYY-WW (ejemplo: 2025-33)")
         año, semana = map(int, week_arg.split('-'))
         if not (2000 <= año <= 2100 and 1 <= semana <= 53):
             parser.error("Valores inválidos. El año debe estar entre 2000 y 2100, y la semana entre 1 y 53")
     elif not args.data_file:
-        parser.error("Se requiere el archivo de datos cuando no se usa --fix-week o --query-week")
+        parser.error("Se requiere el archivo de datos cuando no se usa --fix-week, --query-week o --empty-week")
     
     if args.config:
         if not os.path.isfile(args.config):
@@ -112,7 +115,7 @@ def get_config_path():
         if not os.path.isfile(config_path):
             raise FileNotFoundError(f"No se encuentra el archivo de configuración por defecto en '{config_path}'")
     
-    return config_path, args.data_file, args.confirm_week, args.fix_week, args.query_week
+    return config_path, args.data_file, args.confirm_week, args.fix_week, args.query_week, args.empty_week
 
 def load_config(config_path):
     """Carga la configuración desde un archivo JSON.
@@ -459,39 +462,151 @@ def load_data(data_file):
     
     return data
 
+def send_empty_week(token, company, cronograma, attempt, debug_enabled, config):
+    """Envía una semana sin operaciones.
+    
+    Args:
+        token: Token de autenticación
+        company: Código de la compañía
+        cronograma: Semana a enviar (formato YYYY-WW)
+        attempt: Número de intento actual
+        debug_enabled: Si está en modo debug
+        config: Configuración del script
+    
+    Returns:
+        bool: True si la operación fue exitosa
+
+    Raises:
+        RuntimeError: Si hay un error al procesar la solicitud
+    """
+    url = build_url(config, "entregaSemanal")
+    headers = {
+        "Content-Type": "application/json",
+        "Token": token
+    }
+
+    payload = {
+        "CODIGOCOMPANIA": company,
+        "TIPOENTREGA": "SEMANAL",
+        "CRONOGRAMA": cronograma,
+        "OPERACIONES": []
+    }
+
+    if debug_enabled and attempt == 1:
+        print("DEBUG: JSON de semana vacía:\n\r", json.dumps(payload, indent=2))
+
+    response = requests.post(url, json=payload, headers=headers)
+    
+    # Procesar respuesta
+    try:
+        response_json = response.json()
+    except Exception:
+        response_json = {}
+
+    # En caso de éxito
+    if response.status_code == 200:
+        print(f"Semana vacía {cronograma} enviada exitosamente.")
+        return True
+        
+    # En caso de error
+    error_message = (
+        response_json.get("message") or
+        response_json.get("detail") or
+        response_json.get("errors") or
+        response.text
+    )
+    
+    if not isinstance(error_message, str):
+        error_message = json.dumps(error_message, indent=2, ensure_ascii=False)
+    
+    if debug_enabled and attempt == 1:
+        print("DEBUG: Respuesta del servidor:\n\r", response.text)
+    
+    if response.status_code == 409:
+        raise RuntimeError(error_message)
+    elif response.status_code == 401:
+        raise RuntimeError("Error de autenticación. Verifique sus credenciales.")
+    elif response.status_code == 403:
+        raise RuntimeError("No tiene permisos para realizar esta operación.")
+    else:
+        raise RuntimeError(f"Error al enviar semana vacía: {error_message}")
+
 def main():
     """Función principal del script."""
     try:
-        config_path, data_file, confirm_week, fix_week, query_week = get_config_path()
+        config_path, data_file, confirm_week, fix_week, query_week, empty_week = get_config_path()
         config = load_config(config_path)
         
         # Configurar logging
         setup_logging(config.get('debug', False))
         
+        # Obtener el código de compañía desde las variables de entorno
+        company = os.getenv('SSN_COMPANY')
+        if not company:
+            raise RuntimeError("Falta la variable de entorno SSN_COMPANY")
+        
         # Iniciar sesión
-        session = requests.Session()
         token = authenticate(config, config.get('debug', False))
-        session.headers['Authorization'] = f"Bearer {token}"
+        
+        # Número máximo de reintentos (por defecto 3 si no está especificado)
+        max_retries = config.get('retries', 3)
         
         if query_week:
-            # Modo consulta: obtener estado de una semana específica
-            query_semana(token, os.getenv('SSN_COMPANY'), query_week, 1, config.get('debug', False), config)
+            for attempt in range(1, max_retries + 1):
+                try:
+                    if query_semana(token, company, query_week, attempt, config.get('debug', False), config):
+                        break
+                except RuntimeError as e:
+                    if attempt == max_retries:
+                        raise
+                    print(f"Intento {attempt} fallido: {str(e)}")
         elif fix_week:
-            # Modo corrección: reenviar datos de una semana específica
-            fix_semana(token, os.getenv('SSN_COMPANY'), fix_week, 1, config.get('debug', False), config)
+            for attempt in range(1, max_retries + 1):
+                try:
+                    if fix_semana(token, company, fix_week, attempt, config.get('debug', False), config):
+                        break
+                except RuntimeError as e:
+                    if attempt == max_retries:
+                        raise
+                    print(f"Intento {attempt} fallido: {str(e)}")
+        elif empty_week:
+            for attempt in range(1, max_retries + 1):
+                try:
+                    if send_empty_week(token, company, empty_week, attempt, config.get('debug', False), config):
+                        break
+                except RuntimeError as e:
+                    if attempt == max_retries:
+                        raise
+                    print(f"Intento {attempt} fallido: {str(e)}")
         else:
-            # Modo normal: procesar archivo de datos y opcionalmente confirmar
+            # Cargar datos desde el archivo JSON
             data = load_data(data_file)
-            cronograma = data.get('CRONOGRAMA')
-            records = data.get('OPERACIONES', [])
             
-            # Procesar la semana
-            enviar_entrega(token, os.getenv('SSN_COMPANY'), records, cronograma, 1, config.get('debug', False), config)
+            # Intentar enviar los datos con reintentos
+            for attempt in range(1, max_retries + 1):
+                try:
+                    if enviar_entrega(token, company, data["OPERACIONES"], data["CRONOGRAMA"], 
+                                    attempt, config.get('debug', False), config):
+                        break
+                except RuntimeError as e:
+                    if attempt == max_retries:
+                        raise
+                    print(f"Intento {attempt} fallido: {str(e)}")
             
+            # Si se solicitó confirmar la entrega
             if confirm_week:
-                confirmar_entrega(token, os.getenv('SSN_COMPANY'), cronograma, 1, config.get('debug', False), config)
-                mover_archivo_procesado(data_file)
-        
+                for attempt in range(1, max_retries + 1):
+                    try:
+                        if confirmar_entrega(token, company, data["CRONOGRAMA"], 
+                                          attempt, config.get('debug', False), config):
+                            # Si la confirmación fue exitosa, mover el archivo
+                            mover_archivo_procesado(data_file)
+                            break
+                    except RuntimeError as e:
+                        if attempt == max_retries:
+                            raise
+                        print(f"Intento {attempt} fallido: {str(e)}")
+    
     except (requests.exceptions.HTTPError, RuntimeError) as e:
         # Errores esperados del API o de validación
         print(f"\nError: {str(e)}", file=sys.stderr)
@@ -499,10 +614,10 @@ def main():
     except Exception as e:
         # Errores inesperados
         if config.get('debug', False):
-            logging.exception("Error inesperado:")
+            import traceback
+            traceback.print_exc()
         else:
             print(f"\nError inesperado: {str(e)}", file=sys.stderr)
-            print("Use --config con debug=true para más detalles", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":
