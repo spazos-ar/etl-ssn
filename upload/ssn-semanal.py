@@ -485,12 +485,14 @@ def send_empty_week(token, company, cronograma, attempt, debug_enabled, config):
         "Token": token
     }
 
-    payload = {
-        "CODIGOCOMPANIA": company,
-        "TIPOENTREGA": "SEMANAL",
-        "CRONOGRAMA": cronograma,
-        "OPERACIONES": []
-    }
+    # Crear payload con orden específico de campos
+    from collections import OrderedDict
+    payload = OrderedDict([
+        ("CRONOGRAMA", cronograma),
+        ("CODIGOCOMPANIA", company),
+        ("TIPOENTREGA", "SEMANAL"),
+        ("OPERACIONES", [])
+    ])
 
     if debug_enabled and attempt == 1:
         print("DEBUG: JSON de semana vacía:\n\r", json.dumps(payload, indent=2))
