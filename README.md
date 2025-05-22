@@ -66,6 +66,9 @@ pip install -r requirements.txt
 
 # Pedir rectificativa de una semana específica
 .\Procesar.bat fix 2025-15
+
+# Enviar una semana vacía sin operaciones
+.\Procesar.bat empty 2025-15
 ```
 
 El script va a hacer automáticamente según la opción que elijas:
@@ -112,6 +115,9 @@ python upload/ssn-semanal.py --query-week 2025-15
 # Pedir Rectificativa de una semana específica
 python upload/ssn-semanal.py --fix-week 2025-15
 
+# Enviar una semana sin operaciones
+python upload/ssn-semanal.py --empty-week 2025-15
+
 # Especificar un archivo de configuración alternativo
 python upload/ssn-semanal.py --config otra-config.json data/Semana15.json
 ```
@@ -121,6 +127,7 @@ Los argumentos disponibles son:
 - `--confirm-week`: Confirma la entrega semanal y mueve el archivo a processed/
 - `--fix-week YYYY-WW`: Pide rectificativa de una semana específica
 - `--query-week YYYY-WW`: Consulta el estado de una semana específica
+- `--empty-week YYYY-WW`: Envía una semana sin operaciones (formato YYYY-WW)
 
 Los dos scripts usan la configuración de sus respectivos archivos `config.json` y las credenciales del archivo `.env`. Las credenciales requeridas son:
 - `SSN_USER`: Usuario para autenticación
