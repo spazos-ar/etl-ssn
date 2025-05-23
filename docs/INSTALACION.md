@@ -123,6 +123,31 @@ python .\extract\xls-semanal.py --xls-path .\data\datos_semanales.xlsx
 .\Procesar.bat query 2025-15
 ```
 
+## Actualización de versión
+
+Para actualizar el sistema a la última versión disponible en el repositorio:
+
+1. Abrí una ventana de PowerShell o CMD:
+   - Presioná `Windows + R`
+   - Escribí `powershell` y presioná Enter
+
+2. Navegá hasta la carpeta del proyecto:
+```powershell
+cd $HOME\source\repos\etl-ssn
+```
+
+3. Ejecutá el comando para actualizar:
+```powershell
+git pull origin main
+```
+
+Este comando va a:
+- Descargar los últimos cambios del repositorio remoto
+- Actualizar tus archivos locales a la última versión
+- Mantener tus archivos de configuración y datos sin modificar
+
+> **Nota**: Si tenés cambios locales que no querés perder, primero tenés que hacer commit de esos cambios o guardarlos temporalmente con `git stash`.
+
 ## Solución de Problemas
 
 ### Error: "python no se reconoce como un comando..."
