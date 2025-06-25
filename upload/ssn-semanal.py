@@ -72,7 +72,7 @@ def get_config_path():
             empty_week: String con la semana a enviar vacía (formato YYYY-WW)
     """
     parser = argparse.ArgumentParser(description='Envía datos semanales a la SSN')
-    parser.add_argument('--config', help='Ruta al archivo de configuración')
+    parser.add_argument('--config', help='Ruta al archivo de configuración', default='config-semanal.json')
     
     # Grupo mutuamente excluyente para los modos de operación
     group = parser.add_mutually_exclusive_group()
@@ -111,7 +111,7 @@ def get_config_path():
         config_path = args.config
     else:
         # Si no se especifica, usar el config.json en el directorio del script
-        config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+        config_path = 'config-semanal.json'
         if not os.path.isfile(config_path):
             raise FileNotFoundError(f"No se encuentra el archivo de configuración por defecto en '{config_path}'")
     
@@ -297,10 +297,10 @@ def confirmar_entrega(token, company, cronograma, attempt, debug_enabled, config
         raise RuntimeError(f"Error al confirmar: {response.status_code} - {error_message}")
 
 def mover_archivo_procesado(data_file):
-    """Mueve el archivo JSON procesado a la carpeta processed/."""
+    """Mueve el archivo JSON procesado a la carpeta processed/weekly/."""
     try:
-        # Crear directorio processed/ si no existe
-        processed_dir = os.path.join(os.path.dirname(data_file), "processed")
+        # Crear directorio processed/weekly/ si no existe
+        processed_dir = os.path.join(os.path.dirname(data_file), "processed", "weekly")
         os.makedirs(processed_dir, exist_ok=True)
 
         # Mover el archivo

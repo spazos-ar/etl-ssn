@@ -67,8 +67,8 @@ def get_config_path():
             raise FileNotFoundError(f"El archivo de configuración '{args.config}' no existe.")
         config_path = args.config
     else:
-        # Si no se especifica, usar el config.json en el directorio del script
-        config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+        # Si no se especifica, usar el config-semanal.json en el directorio del script
+        config_path = os.path.join(os.path.dirname(__file__), 'config-semanal.json')
         if not os.path.isfile(config_path):
             raise FileNotFoundError(f"No se encuentra el archivo de configuración por defecto en '{config_path}'")
     
