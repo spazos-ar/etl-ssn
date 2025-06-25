@@ -67,8 +67,13 @@ def build_url(config, endpoint):
     return config['baseUrl'].rstrip('/') + config['endpoints'][endpoint]
 
 def enviar_entrega(token, data, config):
+    # Asegura que cada registro en STOCKS tenga el campo TIPO igual a TIPOSTOCK
+    for reg in data.get("STOCKS", []):
+        if "TIPOSTOCK" in reg:
+            reg["TIPO"] = reg["TIPOSTOCK"]
     url = build_url(config, "entregaMensual")
     headers = {"Content-Type": "application/json", "Token": token}
+    print("DEBUG: JSON enviado:\n", json.dumps(data, indent=2, ensure_ascii=False))
     response = requests.post(url, json=data, headers=headers)
     if response.status_code != 200:
         raise RuntimeError(f"Error al enviar: {response.status_code} - {response.text}")
