@@ -5,28 +5,28 @@ setlocal enabledelayedexpansion
 REM Mostrar ayuda si no hay argumentos
 if "%~1"=="" (
     echo Uso:
-    echo   Procesar.bat datos_semanales.xlsx         - Extraer datos
-    echo   Procesar.bat datos_semanales.xlsx full    - Extraer y enviar con confirmación
-    echo   Procesar.bat upload                       - Solo enviar JSONs existentes
-    echo   Procesar.bat query YYYY-WW                - Consultar estado de una semana
-    echo   Procesar.bat fix YYYY-WW                  - Corregir datos de una semana
+    echo   ProcesarSem.bat datos_semanales.xlsx         - Extraer datos
+    echo   ProcesarSem.bat datos_semanales.xlsx full    - Extraer y enviar con confirmacion
+    echo   ProcesarSem.bat upload                       - Solo enviar JSONs existentes
+    echo   ProcesarSem.bat query YYYY-WW                - Consultar estado de una semana
+    echo   ProcesarSem.bat fix YYYY-WW                  - Corregir datos de una semana
     exit /b 1
 )
 
 REM Configurar rutas
-set "EXTRACT_CONFIG=.\extract\config.json"
-set "UPLOAD_CONFIG=.\upload\config.json"
-set "PROCESSED_DIR=.\data\processed"
+set "EXTRACT_CONFIG=.\extract\config-semanal.json"
+set "UPLOAD_CONFIG=.\upload\config-semanal.json"
+set "PROCESSED_DIR=.\data\processed\weekly"
 set "DATA_DIR=.\data"
 
-REM Crear carpeta processed si no existe
+REM Crear carpeta processed\weekly si no existe
 if not exist "!PROCESSED_DIR!" mkdir "!PROCESSED_DIR!"
 
 REM Procesar comando query
 if "%~1"=="query" (
     if "%~2"=="" (
         echo Error: Debe especificar la semana en formato YYYY-WW
-        echo Ejemplo: Procesar.bat query 2025-15
+        echo Ejemplo: ProcesarSem.bat query 2025-15
         exit /b 1
     )
     python .\upload\ssn-semanal.py --query-week %2
@@ -37,14 +37,14 @@ REM Procesar comando fix
 if "%~1"=="fix" (
     if "%~2"=="" (
         echo Error: Debe especificar la semana en formato YYYY-WW
-        echo Ejemplo: Procesar.bat fix 2025-15
+        echo Ejemplo: ProcesarSem.bat fix 2025-15
         exit /b 1
     )
     python .\upload\ssn-semanal.py --fix-week %2
     exit /b !ERRORLEVEL!
 )
 
-REM Manejar caso de solo envío
+REM Manejar caso de solo envio
 if "%~1"=="upload" (
     for %%f in ("!DATA_DIR!\Semana*.json") do (
         echo Procesando %%~nxf...
@@ -61,7 +61,6 @@ if "%~1"=="upload" (
 REM Procesar archivo Excel
 set "EXCEL_FILE=%~1"
 if not exist "!EXCEL_FILE!" (
-    REM Si no existe en la ruta actual, buscar en la carpeta data
     set "EXCEL_FILE=!DATA_DIR!\%~1"
 )
 
@@ -83,11 +82,10 @@ if exist "!EXCEL_FILE!" (
                 echo Error al procesar %%~nxf
                 exit /b !ERRORLEVEL!
             )
-            move "%%f" "!PROCESSED_DIR!"
         )
         echo Procesamiento completo
     ) else (
-        echo Extracción completa. Use 'Procesar.bat upload' para enviar los datos
+        echo Extraccion completa. Use 'ProcesarSem.bat upload' para enviar los datos
     )
 ) else (
     echo Error: No se encuentra el archivo %1

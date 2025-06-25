@@ -88,7 +88,7 @@ Con el entorno virtual activado, instala las dependencias:
 pip install -r requirements.txt
 ```
 
-### 4. Configurar Credenciales
+### 4. Configurar Credenciales y Archivos de Configuración
 
 1. Crea una copia del archivo de ejemplo de configuración:
 ```powershell
@@ -107,21 +107,49 @@ SSN_PASSWORD=contraseña
 SSN_COMPANY=codigo_compania
 ```
 
+4. Revisá los archivos de configuración para ambos flujos:
+   - Extracción semanal: `extract/config-semanal.json`
+   - Extracción mensual: `extract/config-mensual.json`
+   - Carga semanal: `upload/config-semanal.json`
+   - Carga mensual: `upload/config-mensual.json`
+
 ## Verificar la Instalación
 
 Para verificar que todo esté correctamente instalado:
 
 1. Asegúrate de que el entorno virtual esté activado (verás `(.venv)` al inicio del prompt)
 
-2. Prueba el script de extracción:
+2. Prueba el script de extracción semanal:
 ```powershell
 python .\extract\xls-semanal.py --xls-path .\data\datos_semanales.xlsx
 ```
 
-3. Si no hay errores, prueba una consulta al sistema SSN:
+3. Prueba el script de extracción mensual:
 ```powershell
-.\Procesar.bat query 2025-15
+python .\extract\xls-mensual.py --xls-path .\data\datos_mensuales.xlsx
 ```
+
+4. Si no hay errores, probá una consulta al sistema SSN (flujo semanal):
+```powershell
+.\ProcesarSem.bat query 2025-15
+```
+
+5. Para el flujo mensual, podés ejecutar:
+```powershell
+.\ProcesarMes.bat upload
+```
+
+## Estructura de Carpetas y Archivos
+
+- `data/`: Carpeta para archivos de entrada y salida
+  - `datos_semanales.xlsx`: Archivo de entrada semanal
+  - `datos_mensuales.xlsx`: Archivo de entrada mensual
+  - `processed/weekly/`: Archivos JSON procesados semanalmente
+  - `processed/monthly/`: Archivos JSON procesados mensualmente
+- `extract/`: Scripts y configuraciones de extracción
+  - `xls-semanal.py`, `xls-mensual.py`, `config-semanal.json`, `config-mensual.json`
+- `upload/`: Scripts y configuraciones de carga
+  - `ssn-semanal.py`, `ssn-mensual.py`, `config-semanal.json`, `config-mensual.json`
 
 ## Actualización de versión
 
