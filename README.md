@@ -173,13 +173,13 @@ Este script se encarga de subir y gestionar los datos mensuales en el sistema de
 
 ```powershell
 # Cargar un archivo JSON de datos mensual - sin confirmacion
-python upload/ssn-mensual.py data/Mes-2024-05.json
+python upload/ssn-mensual.py data/Mes-2025-05.json
 
 # Cargar y confirmar un archivo JSON de datos mensual
-python upload/ssn-mensual.py --confirm-month data/Mes-2024-05.json
+python upload/ssn-mensual.py --confirm-month data/Mes-2025-05.json
 
 # Especificar un archivo de configuración alternativo
-python upload/ssn-mensual.py --config upload/config-mensual.json data/Mes-2024-05.json
+python upload/ssn-mensual.py --config upload/config-mensual.json data/Mes-2025-05.json
 ```
 
 Los argumentos disponibles para ambos scripts de carga son:
