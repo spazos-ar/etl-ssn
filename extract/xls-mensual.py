@@ -122,6 +122,33 @@ def process_inversiones(df):
         records.append(record)
     return records
 
+def format_fecha_ddmmaaaa(value):
+    """Convierte cualquier valor de fecha a string DDMMYYYY."""
+    import pandas as pd
+    if pd.isna(value) or value == "":
+        return ""
+    try:
+        if isinstance(value, str):
+            # Si ya está en formato DDMMYYYY
+            if len(value) == 8 and value.isdigit():
+                return value
+            # Si es formato YYYY-MM-DD o YYYY-MM-DD HH:MM:SS
+            if '-' in value:
+                try:
+                    dt = pd.to_datetime(value)
+                    return dt.strftime("%d%m%Y")
+                except Exception:
+                    pass
+        if isinstance(value, (int, float)):
+            # Fecha Excel
+            dt = pd.to_datetime("1899-12-30") + pd.to_timedelta(float(value), unit="D")
+            return dt.strftime("%d%m%Y")
+        if isinstance(value, pd.Timestamp) or isinstance(value, datetime):
+            return value.strftime("%d%m%Y")
+    except Exception:
+        pass
+    return str(value)
+
 def process_plazo_fijo(df):
     records = []
     for idx, row in df.iterrows():
@@ -131,10 +158,8 @@ def process_plazo_fijo(df):
                 "TIPOPF": str(row["TIPOPF"]),
                 "BIC": str(row["BIC"]),
                 "CDF": str(row["CDF"]),
-                "FECHACONSTITUCION": str(row["FECHACONSTITUCION"]),
-                # "FECHACONSTITUCION": format_date(row['FECHACONSTITUCION'], date_format='DDMMYYYY'),
-                "FECHAVENCIMIENTO": str(row["FECHAVENCIMIENTO"]),
-                # "FECHAVENCIMIENTO": format_date(row['FECHAVENCIMIENTO'], date_format='DDMMYYYY'),
+                "FECHACONSTITUCION": format_fecha_ddmmaaaa(row["FECHACONSTITUCION"]),
+                "FECHAVENCIMIENTO": format_fecha_ddmmaaaa(row["FECHAVENCIMIENTO"]),
                 "MONEDA": str(row["MONEDA"]),
                 "VALORNOMINALORIGEN": int(row["VALORNOMINALORIGEN"]),
                 "VALORNOMINALNACIONAL": int(row["VALORNOMINALNACIONAL"]),
@@ -164,8 +189,8 @@ def process_cheques(df):
                 "TIPOSTOCK": "C",
                 "CODIGOSGR": str(row["CODIGOSGR"]),
                 "CODIGOCHEQUE": str(row["CODIGOCHEQUE"]),
-                "FECHAEMISION": str(row["FECHAEMISION"]),
-                "FECHAVENCIMIENTO": str(row["FECHAVENCIMIENTO"]),
+                "FECHAEMISION": format_fecha_ddmmaaaa(row["FECHAEMISION"]),
+                "FECHAVENCIMIENTO": format_fecha_ddmmaaaa(row["FECHAVENCIMIENTO"]),
                 "MONEDA": str(row["MONEDA"]),
                 "VALORNOMINAL": int(row["VALORNOMINAL"]),
                 "VALORADQUISICION": int(row["VALORADQUISICION"]),
@@ -177,7 +202,7 @@ def process_cheques(df):
                 "TASA": format_number(row["TASA"], 2),
                 "VALORCONTABLE": int(row["VALORCONTABLE"]),
                 "FINANCIERA": int(row["FINANCIERA"]),
-                "FECHAADQUISICION": str(row["FECHAADQUISICION"])
+                "FECHAADQUISICION": format_fecha_ddmmaaaa(row["FECHAADQUISICION"])
             }
         except Exception as e:
             print(f"Error en fila {idx} de 'Cheques': {e}")

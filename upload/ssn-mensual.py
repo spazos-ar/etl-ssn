@@ -43,7 +43,23 @@ def get_args():
     elif not args.data_file:
         parser.error("Debe especificarse el archivo de datos a enviar")
 
-    config_path = args.config or os.path.join(os.path.dirname(__file__), 'config-mensual.json')
+    if args.config:
+        if os.path.isfile(args.config):
+            config_path = args.config
+        else:
+            # Si la ruta es relativa, buscar en la carpeta del script
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            alt_path = os.path.join(script_dir, args.config)
+            if os.path.isfile(alt_path):
+                config_path = alt_path
+            else:
+                raise FileNotFoundError(f"El archivo de configuración '{args.config}' no existe ni en el directorio actual ni en '{alt_path}'.")
+    else:
+        # Si no se especifica, usar el config-mensual.json en el directorio del script
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(script_dir, 'config-mensual.json')
+        if not os.path.isfile(config_path):
+            raise FileNotFoundError(f"No se encuentra el archivo de configuración por defecto en '{config_path}'")
     return config_path, args.data_file, args.confirm_month, args.fix_month, args.query_month, args.empty_month
 
 def load_config(config_path):
@@ -76,7 +92,20 @@ def enviar_entrega(token, data, config):
     print("DEBUG: JSON enviado:\n", json.dumps(data, indent=2, ensure_ascii=False))
     response = requests.post(url, json=data, headers=headers)
     if response.status_code != 200:
-        raise RuntimeError(f"Error al enviar: {response.status_code} - {response.text}")
+        # Manejo de error amigable
+        try:
+            resp_json = response.json()
+            msg = resp_json.get("message", "")
+            errors = resp_json.get("errors")
+            if errors:
+                if isinstance(errors, list):
+                    errors = "\n- " + "\n- ".join(str(e) for e in errors)
+                print(f"\nError al enviar ({response.status_code}): {msg}\nDetalles:{errors}")
+            else:
+                print(f"\nError al enviar ({response.status_code}): {msg or response.text}")
+        except Exception:
+            print(f"\nError al enviar ({response.status_code}): {response.text}")
+        sys.exit(1)
     print("Entrega mensual enviada correctamente.")
 
 def confirmar_entrega(token, company, cronograma, config):

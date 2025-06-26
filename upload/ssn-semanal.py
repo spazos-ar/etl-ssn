@@ -106,12 +106,20 @@ def get_config_path():
         parser.error("Se requiere el archivo de datos cuando no se usa --fix-week, --query-week o --empty-week")
     
     if args.config:
-        if not os.path.isfile(args.config):
-            raise FileNotFoundError(f"El archivo de configuración '{args.config}' no existe.")
-        config_path = args.config
+        if os.path.isfile(args.config):
+            config_path = args.config
+        else:
+            # Si la ruta es relativa, buscar en la carpeta del script
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            alt_path = os.path.join(script_dir, args.config)
+            if os.path.isfile(alt_path):
+                config_path = alt_path
+            else:
+                raise FileNotFoundError(f"El archivo de configuración '{args.config}' no existe ni en el directorio actual ni en '{alt_path}'.")
     else:
         # Si no se especifica, usar el config.json en el directorio del script
-        config_path = 'config-semanal.json'
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(script_dir, 'config-semanal.json')
         if not os.path.isfile(config_path):
             raise FileNotFoundError(f"No se encuentra el archivo de configuración por defecto en '{config_path}'")
     
@@ -535,6 +543,7 @@ def send_empty_week(token, company, cronograma, attempt, debug_enabled, config):
 
 def main():
     """Función principal del script."""
+    config = None  # Inicializar para evitar UnboundLocalError
     try:
         config_path, data_file, confirm_week, fix_week, query_week, empty_week = get_config_path()
         config = load_config(config_path)
@@ -615,7 +624,7 @@ def main():
         sys.exit(1)
     except Exception as e:
         # Errores inesperados
-        if config.get('debug', False):
+        if config and config.get('debug', False):
             import traceback
             traceback.print_exc()
         else:
