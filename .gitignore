@@ -1,17 +1,20 @@
 # Excluir archivos de credenciales y configuraciones sensibles
-*.json
-!extract/config.json
-!upload/config.json
-!docs/*.json
-
-# Asegurar que los archivos JSON de data y processed se excluyan
-data/**/*.json
-data/*.json
-
-# Archivos de configuración específicos del entorno
 .env
 !.env.example
 *.ini
+
+# Excluir archivos JSON de datos (pero NO los de configuración)
+data/**/*.json
+data/*.json
+
+# Incluir explícitamente los archivos de configuración JSON
+!extract/config.json
+!extract/config-semanal.json
+!extract/config-mensual.json
+!upload/config.json
+!upload/config-semanal.json
+!upload/config-mensual.json
+!docs/*.json
 
 # Archivos de caché de Python
 __pycache__/

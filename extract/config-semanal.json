@@ -1,0 +1,6 @@
+{
+    "company": "0540",
+    "decimal_separator": ",",
+    "date_format": "DDMMYYYY",
+    "xls_path": "data/datos_semanales.xlsx"
+}
