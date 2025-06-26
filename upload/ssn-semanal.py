@@ -79,7 +79,7 @@ def get_config_path():
     group.add_argument('--confirm-week', action='store_true', 
                       help='Confirma la entrega semanal y mueve el archivo a processed/')
     group.add_argument('--fix-week', metavar='YYYY-WW',
-                      help='Corrige una semana específica (formato YYYY-WW)')
+                      help='Pide rectificativa de una semana específica (formato YYYY-WW)')
     group.add_argument('--query-week', metavar='YYYY-WW',
                       help='Consulta el estado de una semana específica (formato YYYY-WW)')
     group.add_argument('--empty-week', metavar='YYYY-WW',
@@ -618,6 +618,9 @@ def main():
                             raise
                         print(f"Intento {attempt} fallido: {str(e)}")
     
+    except ValueError as e:
+        print(f"Error: {str(e)}", file=sys.stderr)
+        sys.exit(1)
     except (requests.exceptions.HTTPError, RuntimeError) as e:
         # Errores esperados del API o de validación
         print(f"\nError: {str(e)}", file=sys.stderr)

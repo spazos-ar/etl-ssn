@@ -28,7 +28,7 @@ def get_args():
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--confirm-month', action='store_true', help='Confirma la entrega mensual y mueve el archivo a processed/')
-    group.add_argument('--fix-month', metavar='YYYY-MM', help='Corrige un mes específico (formato YYYY-MM)')
+    group.add_argument('--fix-month', metavar='YYYY-MM', help='Pide rectificativa de un mes específico (formato YYYY-MM)')
     group.add_argument('--query-month', metavar='YYYY-MM', help='Consulta el estado de un mes específico (formato YYYY-MM)')
     group.add_argument('--empty-month', metavar='YYYY-MM', help='Envía un mes vacío sin inversiones (formato YYYY-MM)')
 
@@ -152,4 +152,17 @@ def main():
             mover_archivo_procesado(data_file)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except ValueError as e:
+        print(f"\nError: {e}")
+        sys.exit(1)
+    except FileNotFoundError as e:
+        print(f"\nError: {e}")
+        sys.exit(1)
+    except RuntimeError as e:
+        print(f"\nError: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\nError inesperado: {e}")
+        sys.exit(1)

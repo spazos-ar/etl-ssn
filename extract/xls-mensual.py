@@ -194,7 +194,7 @@ def process_cheques(df):
                 "MONEDA": str(row["MONEDA"]),
                 "VALORNOMINAL": int(row["VALORNOMINAL"]),
                 "VALORADQUISICION": int(row["VALORADQUISICION"]),
-                "GRUPOECONOMICO": int(row["GRUPOECONOMICO"]),
+                "EMISORGRUPOECONOMICO": int(row["EMISORGRUPOECONOMICO"]),
                 "LIBREDISPONIBILIDAD": int(row["LIBREDISPONIBILIDAD"]),
                 "ENCUSTODIA": int(row["ENCUSTODIA"]),
                 "CODIGOAFECTACION": str(row["CODIGOAFECTACION"]),
