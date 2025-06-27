@@ -164,11 +164,63 @@ def fix_mes(token, company, cronograma, config):
     print("DEBUG: Respuesta del servidor (PUT):\n", response.text)
     raise RuntimeError(f"Error al pedir rectificativa mensual: {error_message}")
 
+def query_mes(token, company, cronograma, config):
+    """Consulta el estado de un mes específico.
+    
+    Args:
+        token: Token de autenticación
+        company: Código de la compañía
+        cronograma: Mes a consultar (formato YYYY-MM)
+        config: Configuración del script
+    """
+    url = build_url(config, "entregaMensual")
+    headers = {"Content-Type": "application/json", "Token": token}
+    
+    # Construir query params usando camelCase como especifica la documentación
+    params = {
+        "codigoCompania": company,
+        "tipoEntrega": "Mensual",
+        "cronograma": cronograma
+    }
+
+    print("DEBUG: Consultando mes con parámetros:\n", json.dumps(params, indent=2))
+    response = requests.get(url, params=params, headers=headers)
+
+    if response.status_code == 200:
+        try:
+            data = response.json()
+            print(f"Estado del mes {cronograma}:")
+            print(json.dumps(data, indent=2, ensure_ascii=False))
+            return True
+        except json.JSONDecodeError:
+            print(f"La respuesta no es un JSON válido: {response.text}")
+            raise RuntimeError("Error al procesar la respuesta del servidor")
+    else:
+        try:
+            resp_json = response.json()
+            error_message = (
+                resp_json.get("errors") or
+                resp_json.get("message") or
+                resp_json.get("detail") or
+                response.text
+            )
+            if not isinstance(error_message, str):
+                error_message = json.dumps(error_message, indent=2, ensure_ascii=False)
+        except Exception as e:
+            error_message = f"No se pudo procesar la respuesta del servidor: {str(e)}\nRespuesta completa: {response.text}"
+        
+        print("DEBUG: Respuesta del servidor:\n", response.text)
+        raise RuntimeError(f"Error al consultar mes: {response.status_code} - {error_message}")
+
 def main():
     config_path, data_file, confirm, fix, query, empty = get_args()
     config = load_config(config_path)
     token = authenticate(config)
     company = os.getenv('SSN_COMPANY')
+
+    if query:
+        query_mes(token, company, query, config)
+        return
 
     if fix:
         fix_mes(token, company, fix, config)
