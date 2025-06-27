@@ -135,11 +135,44 @@ def mover_archivo_procesado(data_file):
     shutil.move(data_file, archivo_destino)
     print(f"Archivo movido exitosamente a: {archivo_destino}")
 
+def fix_mes(token, company, cronograma, config):
+    """Solicita rectificativa mensual usando PUT con el body requerido por la SSN."""
+    url = build_url(config, "entregaMensual")
+    headers = {"Content-Type": "application/json", "Token": token}
+    payload = {
+        "cronograma": cronograma,
+        "codigoCompania": company,
+        "tipoEntrega": "Mensual"
+    }
+    print("DEBUG: JSON de rectificativa mensual (PUT):\n", json.dumps(payload, indent=2))
+    response = requests.put(url, json=payload, headers=headers)
+    try:
+        resp_json = response.json()
+    except Exception:
+        resp_json = {}
+    if response.status_code == 200:
+        print(f"Mes {cronograma} (rectificativa) solicitado exitosamente.")
+        return True
+    error_message = (
+        resp_json.get("message") or
+        resp_json.get("detail") or
+        resp_json.get("errors") or
+        response.text
+    )
+    if not isinstance(error_message, str):
+        error_message = json.dumps(error_message, indent=2, ensure_ascii=False)
+    print("DEBUG: Respuesta del servidor (PUT):\n", response.text)
+    raise RuntimeError(f"Error al pedir rectificativa mensual: {error_message}")
+
 def main():
     config_path, data_file, confirm, fix, query, empty = get_args()
     config = load_config(config_path)
     token = authenticate(config)
     company = os.getenv('SSN_COMPANY')
+
+    if fix:
+        fix_mes(token, company, fix, config)
+        return
 
     if data_file:
         with open(data_file, 'r', encoding='utf-8') as f:

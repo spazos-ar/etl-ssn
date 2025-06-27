@@ -320,8 +320,7 @@ def mover_archivo_procesado(data_file):
         raise
 
 def fix_semana(token, company, cronograma, attempt, debug_enabled, config):
-    """Envía una corrección para una semana específica.
-    
+    """Envía una corrección (rectificativa) para una semana específica usando PUT.
     Args:
         token: Token de autenticación
         company: Código de la compañía
@@ -329,7 +328,6 @@ def fix_semana(token, company, cronograma, attempt, debug_enabled, config):
         attempt: Número de intento actual
         debug_enabled: Si está en modo debug
         config: Configuración del script
-    
     Raises:
         RuntimeError: Si hay un error al procesar la solicitud
     """
@@ -338,46 +336,32 @@ def fix_semana(token, company, cronograma, attempt, debug_enabled, config):
         "Content-Type": "application/json",
         "Token": token
     }
-
+    # Body en camelCase como requiere la SSN
     payload = {
-        "CODIGOCOMPANIA": company,
-        "TIPOENTREGA": "SEMANAL",
-        "CRONOGRAMA": cronograma
+        "cronograma": cronograma,
+        "codigoCompania": company,
+        "tipoEntrega": "Semanal"
     }
-
     if debug_enabled and attempt == 1:
-        print("DEBUG: JSON de corrección de semana:\n\r", json.dumps(payload, indent=2))
-
-    response = requests.post(url, json=payload, headers=headers)
-    
-    # Procesar respuesta
+        print("DEBUG: JSON de corrección de semana (PUT):\n\r", json.dumps(payload, indent=2))
+    response = requests.put(url, json=payload, headers=headers)
     try:
         response_json = response.json()
     except Exception:
         response_json = {}
-
-    # En caso de éxito
     if response.status_code == 200:
-        print(f"Semana {cronograma} corregida exitosamente.")
+        print(f"Semana {cronograma} (rectificativa) solicitada exitosamente.")
         return True
-        
-    # En caso de error
     error_message = (
-        response_json.get("message") or  # Mensaje de error principal
-        response_json.get("detail") or   # Detalle del error
-        response_json.get("errors") or   # Lista de errores
-        response.text                    # Respuesta cruda como último recurso
+        response_json.get("message") or
+        response_json.get("detail") or
+        response_json.get("errors") or
+        response.text
     )
-    
-    # Si el error_message es una lista o diccionario, convertirlo a string
     if not isinstance(error_message, str):
         error_message = json.dumps(error_message, indent=2, ensure_ascii=False)
-    
-    # En modo debug, mostrar la respuesta completa
     if debug_enabled and attempt == 1:
-        print("DEBUG: Respuesta del servidor:\n\r", response.text)
-    
-    # Manejar códigos de error específicos
+        print("DEBUG: Respuesta del servidor (PUT):\n\r", response.text)
     if response.status_code == 409:
         raise RuntimeError(error_message)
     elif response.status_code == 401:
@@ -385,7 +369,7 @@ def fix_semana(token, company, cronograma, attempt, debug_enabled, config):
     elif response.status_code == 403:
         raise RuntimeError("No tiene permisos para realizar esta operación.")
     else:
-        raise RuntimeError(f"Error al corregir semana: {error_message}")
+        raise RuntimeError(f"Error al pedir rectificativa: {error_message}")
 
 def query_semana(token, company, cronograma, attempt, debug_enabled, config):
     """Consulta el estado de una semana específica.
