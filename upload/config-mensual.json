@@ -1,7 +1,7 @@
 {
   "retries": 1,
   "debug": true,
-  "baseUrl": "https://testri.ssn.gob.ar/api/",
+  "baseUrl": "https://ri.ssn.gob.ar/api/",
   "endpoints": {
     "login": "/login",
     "entregaMensual": "/inv/entregaMensual",
