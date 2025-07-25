@@ -85,9 +85,6 @@ def build_url(config, endpoint):
 def enviar_entrega(token, data, config):
     # Procesa y valida cada registro en STOCKS
     for reg in data.get("STOCKS", []):
-        if "TIPOSTOCK" in reg:
-            reg["TIPO"] = reg["TIPOSTOCK"]
-            
         # Corrige FECHAPASEVT y PRECIOPASEVT
         if reg.get("TIPOESPECIE") not in ["TP", "ON"] or reg.get("TIPOVALUACION") != "T":
             reg["FECHAPASEVT"] = ""

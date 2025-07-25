@@ -84,12 +84,26 @@ def format_date(value):
         return str(value)
 
 def format_number(value, decimals=0):
+    """Formatea números con las siguientes reglas:
+    - Si el valor es vacío/nulo, devuelve ""
+    - Si el valor es entero, devuelve int aunque decimals>0
+    - Si el valor tiene decimales, devuelve float con los decimales especificados
+    """
     try:
-        if pd.isna(value):
-            return 0
-        return round(float(str(value).replace(",", ".")), decimals)
+        if pd.isna(value) or value == "":
+            return ""
+        
+        # Convertir el valor a float
+        num = float(str(value).replace(",", "."))
+        
+        # Si decimals=0 o el número es entero, devolver como int
+        if decimals == 0 or num.is_integer():
+            return int(num)
+            
+        # Si tiene decimales, redondear al número especificado de decimales
+        return round(num, decimals)
     except:
-        return 0
+        return ""
 
 def process_inversiones(df):
     records = []
@@ -99,21 +113,21 @@ def process_inversiones(df):
                 "TIPO": "I",
                 "TIPOESPECIE": str(row["TIPOESPECIE"]),
                 "CODIGOESPECIE": str(row["CODIGOESPECIE"]),
-                "CANTIDADDEVENGADOESPECIES": format_number(row["CANTIDADDEVENGADOESPECIES"], 6),
-                "CANTIDADPERCIBIDOESPECIES": format_number(row["CANTIDADPERCIBIDOESPECIES"], 6),
-                "CODIGOAFECTACION": int(row["CODIGOAFECTACION"]),
+                "CANTIDADDEVENGADOESPECIES": format_number(row["CANTIDADDEVENGADOESPECIES"], 0),
+                "CANTIDADPERCIBIDOESPECIES": format_number(row["CANTIDADPERCIBIDOESPECIES"], 0),
+                "CODIGOAFECTACION": format_number(row["CODIGOAFECTACION"], 0),
                 "TIPOVALUACION": str(row["TIPOVALUACION"]),
-                "CONCOTIZACION": int(row["CONCOTIZACION"]),
-                "LIBREDISPONIBILIDAD": int(row["LIBREDISPONIBILIDAD"]),
-                "EMISORGRUPOECONOMICO": int(row["EMISORGRUPOECONOMICO"]),
-                "EMISORARTRET": int(row["EMISORARTRET"]),
-                "PREVISIONDESVALORIZACION": int(row["PREVISIONDESVALORIZACION"]),
-                "VALORCONTABLE": int(row["VALORCONTABLE"]),
-                "FECHAPASEVT": "" if pd.isna(row["FECHAPASEVT"]) else str(int(row["FECHAPASEVT"])),
+                "CONCOTIZACION": format_number(row["CONCOTIZACION"], 0),
+                "LIBREDISPONIBILIDAD": format_number(row["LIBREDISPONIBILIDAD"], 0),
+                "EMISORGRUPOECONOMICO": format_number(row["EMISORGRUPOECONOMICO"], 0),
+                "EMISORARTRET": format_number(row["EMISORARTRET"], 0),
+                "PREVISIONDESVALORIZACION": format_number(row["PREVISIONDESVALORIZACION"], 0),
+                "VALORCONTABLE": format_number(row["VALORCONTABLE"], 0),
+                "FECHAPASEVT": format_number(row["FECHAPASEVT"], 0) if not pd.isna(row["FECHAPASEVT"]) else "",
                 "PRECIOPASEVT": format_number(row["PRECIOPASEVT"], 2),
-                "ENCUSTODIA": int(row["ENCUSTODIA"]),
-                "FINANCIERA": int(row["FINANCIERA"]),
-                "VALORFINANCIERO": int(row["VALORFINANCIERO"])
+                "ENCUSTODIA": format_number(row["ENCUSTODIA"], 0),
+                "FINANCIERA": format_number(row["FINANCIERA"], 0),
+                "VALORFINANCIERO": format_number(row["VALORFINANCIERO"], 0)
             }
         except Exception as e:
             print(f"Error en fila {idx} de 'Inversiones': {e}")
@@ -161,18 +175,18 @@ def process_plazo_fijo(df):
                 "FECHACONSTITUCION": format_fecha_ddmmaaaa(row["FECHACONSTITUCION"]),
                 "FECHAVENCIMIENTO": format_fecha_ddmmaaaa(row["FECHAVENCIMIENTO"]),
                 "MONEDA": str(row["MONEDA"]),
-                "VALORNOMINALORIGEN": int(row["VALORNOMINALORIGEN"]),
-                "VALORNOMINALNACIONAL": int(row["VALORNOMINALNACIONAL"]),
-                "EMISORGRUPOECONOMICO": int(row["EMISORGRUPOECONOMICO"]),
-                "LIBREDISPONIBILIDAD": int(row["LIBREDISPONIBILIDAD"]),
-                "ENCUSTODIA": int(row["ENCUSTODIA"]),
-                "CODIGOAFECTACION": int(row["CODIGOAFECTACION"]),
+                "VALORNOMINALORIGEN": format_number(row["VALORNOMINALORIGEN"], 0),
+                "VALORNOMINALNACIONAL": format_number(row["VALORNOMINALNACIONAL"], 0),
+                "EMISORGRUPOECONOMICO": format_number(row["EMISORGRUPOECONOMICO"], 0),
+                "LIBREDISPONIBILIDAD": format_number(row["LIBREDISPONIBILIDAD"], 0),
+                "ENCUSTODIA": format_number(row["ENCUSTODIA"], 0),
+                "CODIGOAFECTACION": format_number(row["CODIGOAFECTACION"], 0),
                 "TIPOTASA": str(row["TIPOTASA"]),
                 "TASA": format_number(row["TASA"], 3),
-                "TITULODEUDA": int(row["TITULODEUDA"]),
+                "TITULODEUDA": format_number(row["TITULODEUDA"], 0),
                 "CODIGOTITULO": str(row["CODIGOTITULO"]),
-                "VALORCONTABLE": int(row["VALORCONTABLE"]),
-                "FINANCIERA": int(row["FINANCIERA"])
+                "VALORCONTABLE": format_number(row["VALORCONTABLE"], 0),
+                "FINANCIERA": format_number(row["FINANCIERA"], 0)
             }
         except Exception as e:
             print(f"Error en fila {idx} de 'Plazo-Fijo': {e}")
@@ -192,16 +206,16 @@ def process_cheques(df):
                 "FECHAEMISION": format_fecha_ddmmaaaa(row["FECHAEMISION"]),
                 "FECHAVENCIMIENTO": format_fecha_ddmmaaaa(row["FECHAVENCIMIENTO"]),
                 "MONEDA": str(row["MONEDA"]),
-                "VALORNOMINAL": int(row["VALORNOMINAL"]),
-                "VALORADQUISICION": int(row["VALORADQUISICION"]),
-                "EMISORGRUPOECONOMICO": int(row["EMISORGRUPOECONOMICO"]),
-                "LIBREDISPONIBILIDAD": int(row["LIBREDISPONIBILIDAD"]),
-                "ENCUSTODIA": int(row["ENCUSTODIA"]),
-                "CODIGOAFECTACION": str(row["CODIGOAFECTACION"]),
+                "VALORNOMINAL": format_number(row["VALORNOMINAL"], 0),
+                "VALORADQUISICION": format_number(row["VALORADQUISICION"], 0),
+                "EMISORGRUPOECONOMICO": format_number(row["EMISORGRUPOECONOMICO"], 0),
+                "LIBREDISPONIBILIDAD": format_number(row["LIBREDISPONIBILIDAD"], 0),
+                "ENCUSTODIA": format_number(row["ENCUSTODIA"], 0),
+                "CODIGOAFECTACION": format_number(row["CODIGOAFECTACION"], 0),
                 "TIPOTASA": str(row["TIPOTASA"]),
                 "TASA": format_number(row["TASA"], 2),
-                "VALORCONTABLE": int(row["VALORCONTABLE"]),
-                "FINANCIERA": int(row["FINANCIERA"]),
+                "VALORCONTABLE": format_number(row["VALORCONTABLE"], 0),
+                "FINANCIERA": format_number(row["FINANCIERA"], 0),
                 "FECHAADQUISICION": format_fecha_ddmmaaaa(row["FECHAADQUISICION"])
             }
         except Exception as e:
