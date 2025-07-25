@@ -96,7 +96,7 @@ def process_inversiones(df):
     for idx, row in df.iterrows():
         try:
             record = {
-                "TIPOSTOCK": "I",
+                "TIPO": "I",
                 "TIPOESPECIE": str(row["TIPOESPECIE"]),
                 "CODIGOESPECIE": str(row["CODIGOESPECIE"]),
                 "CANTIDADDEVENGADOESPECIES": format_number(row["CANTIDADDEVENGADOESPECIES"], 6),
@@ -154,7 +154,7 @@ def process_plazo_fijo(df):
     for idx, row in df.iterrows():
         try:
             record = {
-                "TIPOSTOCK": "P",
+                "TIPO": "P",
                 "TIPOPF": str(row["TIPOPF"]),
                 "BIC": str(row["BIC"]),
                 "CDF": str(row["CDF"]),
@@ -186,7 +186,7 @@ def process_cheques(df):
     for idx, row in df.iterrows():
         try:
             record = {
-                "TIPOSTOCK": "C",
+                "TIPO": "C",
                 "CODIGOSGR": str(row["CODIGOSGR"]),
                 "CODIGOCHEQUE": str(row["CODIGOCHEQUE"]),
                 "FECHAEMISION": format_fecha_ddmmaaaa(row["FECHAEMISION"]),

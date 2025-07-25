@@ -83,28 +83,50 @@ def build_url(config, endpoint):
     return config['baseUrl'].rstrip('/') + config['endpoints'][endpoint]
 
 def enviar_entrega(token, data, config):
-    # Asegura que cada registro en STOCKS tenga el campo TIPO igual a TIPOSTOCK
+    # Procesa y valida cada registro en STOCKS
     for reg in data.get("STOCKS", []):
         if "TIPOSTOCK" in reg:
             reg["TIPO"] = reg["TIPOSTOCK"]
+            
+        # Corrige FECHAPASEVT y PRECIOPASEVT
+        if reg.get("TIPOESPECIE") not in ["TP", "ON"] or reg.get("TIPOVALUACION") != "T":
+            reg["FECHAPASEVT"] = ""
+            reg["PRECIOPASEVT"] = 0.0
+            
+        # Validación de cantidades según tipo de especie
+        tipo_especie = reg.get("TIPOESPECIE", "")
+        cant_devengada = reg.get("CANTIDADDEVENGADOESPECIES", 0)
+        cant_percibida = reg.get("CANTIDADPERCIBIDOESPECIES", 0)
+        
+        # Para especies tipo TP, AC, FF aseguramos que las cantidades sean números positivos
+        if tipo_especie in ["TP", "AC", "FF"]:
+            # Si las cantidades son muy grandes o negativas, las reseteamos a 0
+            if cant_devengada < 0 or cant_devengada > 1e9:
+                reg["CANTIDADDEVENGADOESPECIES"] = 0.0
+            if cant_percibida < 0 or cant_percibida > 1e9:
+                reg["CANTIDADPERCIBIDOESPECIES"] = 0.0
     url = build_url(config, "entregaMensual")
     headers = {"Content-Type": "application/json", "Token": token}
     print("DEBUG: JSON enviado:\n", json.dumps(data, indent=2, ensure_ascii=False))
     response = requests.post(url, json=data, headers=headers)
     if response.status_code != 200:
+        print("\nDEBUG: Headers de respuesta:", dict(response.headers))
         # Manejo de error amigable
         try:
             resp_json = response.json()
-            msg = resp_json.get("message", "")
-            errors = resp_json.get("errors")
-            if errors:
-                if isinstance(errors, list):
-                    errors = "\n- " + "\n- ".join(str(e) for e in errors)
-                print(f"\nError al enviar ({response.status_code}): {msg}\nDetalles:{errors}")
+            print("DEBUG: Respuesta JSON completa:", json.dumps(resp_json, indent=2, ensure_ascii=False))
+            errors = resp_json.get("errores") or resp_json.get("errors")
+            if errors and isinstance(errors, list):
+                print("\nErrores encontrados:")
+                for error in errors:
+                    print(f"- {error}")
             else:
-                print(f"\nError al enviar ({response.status_code}): {msg or response.text}")
-        except Exception:
+                msg = resp_json.get("message", "") or resp_json.get("detail", "") or response.text
+                print(f"\nError ({response.status_code}): {msg}")
+        except Exception as e:
+            print(f"\nDEBUG: Error al parsear JSON: {str(e)}")
             print(f"\nError al enviar ({response.status_code}): {response.text}")
+            print("\nDEBUG: Contenido raw de la respuesta:", response.content)
         sys.exit(1)
     print("Entrega mensual enviada correctamente.")
 
