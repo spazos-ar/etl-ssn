@@ -88,20 +88,27 @@ def enviar_entrega(token, data, config):
         # Corrige FECHAPASEVT y PRECIOPASEVT
         if reg.get("TIPOESPECIE") not in ["TP", "ON"] or reg.get("TIPOVALUACION") != "T":
             reg["FECHAPASEVT"] = ""
-            reg["PRECIOPASEVT"] = 0.0
+            reg["PRECIOPASEVT"] = ""
             
         # Validación de cantidades según tipo de especie
         tipo_especie = reg.get("TIPOESPECIE", "")
-        cant_devengada = reg.get("CANTIDADDEVENGADOESPECIES", 0)
-        cant_percibida = reg.get("CANTIDADPERCIBIDOESPECIES", 0)
+        
+        # Asegurarse de que los campos numéricos sean números y no strings vacíos
+        if reg.get("CANTIDADDEVENGADOESPECIES") == "":
+            reg["CANTIDADDEVENGADOESPECIES"] = 0
+        if reg.get("CANTIDADPERCIBIDOESPECIES") == "":
+            reg["CANTIDADPERCIBIDOESPECIES"] = 0
+            
+        cant_devengada = float(reg.get("CANTIDADDEVENGADOESPECIES", 0))
+        cant_percibida = float(reg.get("CANTIDADPERCIBIDOESPECIES", 0))
         
         # Para especies tipo TP, AC, FF aseguramos que las cantidades sean números positivos
         if tipo_especie in ["TP", "AC", "FF"]:
             # Si las cantidades son muy grandes o negativas, las reseteamos a 0
             if cant_devengada < 0 or cant_devengada > 1e9:
-                reg["CANTIDADDEVENGADOESPECIES"] = 0.0
+                reg["CANTIDADDEVENGADOESPECIES"] = 0
             if cant_percibida < 0 or cant_percibida > 1e9:
-                reg["CANTIDADPERCIBIDOESPECIES"] = 0.0
+                reg["CANTIDADPERCIBIDOESPECIES"] = 0
     url = build_url(config, "entregaMensual")
     headers = {"Content-Type": "application/json", "Token": token}
     print("DEBUG: JSON enviado:\n", json.dumps(data, indent=2, ensure_ascii=False))
