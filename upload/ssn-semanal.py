@@ -72,6 +72,7 @@ def get_config_path():
     """
     parser = argparse.ArgumentParser(description='Envía datos semanales a la SSN')
     parser.add_argument('--config', help='Ruta al archivo de configuración', default='config-semanal.json')
+    parser.add_argument('--test', action='store_true', help='Prueba la conexión SSL con el servidor')
     
     # Grupo mutuamente excluyente para los modos de operación
     group = parser.add_mutually_exclusive_group()
@@ -91,7 +92,10 @@ def get_config_path():
     args = parser.parse_args()
     
     # Validar combinación de argumentos
-    if args.fix_week or args.query_week or args.empty_week:
+    if args.test:
+        if args.data_file:
+            parser.error("No se debe especificar data_file cuando se usa --test")
+    elif args.fix_week or args.query_week or args.empty_week:
         if args.data_file:
             parser.error("El argumento 'data_file' no debe especificarse cuando se usa --fix-week, --query-week o --empty-week")
         # Validar formato de semana (YYYY-WW)
@@ -102,7 +106,7 @@ def get_config_path():
         if not (2000 <= año <= 2100 and 1 <= semana <= 53):
             parser.error("Valores inválidos. El año debe estar entre 2000 y 2100, y la semana entre 1 y 53")
     elif not args.data_file:
-        parser.error("Se requiere el archivo de datos cuando no se usa --fix-week, --query-week o --empty-week")
+        parser.error("Se requiere el archivo de datos cuando no se usa --test, --fix-week, --query-week o --empty-week")
     
     if args.config:
         if os.path.isfile(args.config):
@@ -122,7 +126,7 @@ def get_config_path():
         if not os.path.isfile(config_path):
             raise FileNotFoundError(f"No se encuentra el archivo de configuración por defecto en '{config_path}'")
     
-    return config_path, args.data_file, args.confirm_week, args.fix_week, args.query_week, args.empty_week
+    return config_path, args.data_file, args.confirm_week, args.fix_week, args.query_week, args.empty_week, args.test
 
 def load_config(config_path):
     """Carga la configuración desde un archivo JSON.
@@ -366,12 +370,30 @@ def send_empty_week(token, company, cronograma, attempt, debug_enabled, config):
     except Exception as e:
         raise RuntimeError(f"Error al enviar semana vacía: {str(e)}")
 
+def test_ssl_connection(config):
+    """Prueba la conexión SSL con el servidor."""
+    try:
+        with SSNClient(config, debug=True) as client:
+            # La inicialización del cliente ya prueba la conexión SSL
+            return True
+    except Exception as e:
+        raise RuntimeError(f"Error en la prueba de conexión SSL: {str(e)}")
+
 def main():
     """Función principal del script."""
     config = None  # Inicializar para evitar UnboundLocalError
     try:
-        config_path, data_file, confirm_week, fix_week, query_week, empty_week = get_config_path()
+        config_path, data_file, confirm_week, fix_week, query_week, empty_week, test = get_config_path()
         config = load_config(config_path)
+        
+        # Configurar logging
+        setup_logging(config.get('debug', False))
+        
+        # Verificar si se solicitó una prueba de conexión SSL
+        if test:
+            test_ssl_connection(config)
+            print("Conexión SSL verificada correctamente")
+            return
         
         # Configurar logging
         setup_logging(config.get('debug', False))

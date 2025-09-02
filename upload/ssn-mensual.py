@@ -85,7 +85,10 @@ def get_args():
     parser.add_argument('data_file', nargs='?', help='Archivo JSON con los datos a enviar (no requerido con --fix-month, --query-month, --empty-month o --test)')
     args = parser.parse_args()
 
-    if args.fix_month or args.query_month or args.empty_month:
+    if args.test:
+        if args.data_file:
+            parser.error("No se debe especificar data_file cuando se usa --test")
+    elif args.fix_month or args.query_month or args.empty_month:
         if args.data_file:
             parser.error("No se debe especificar data_file cuando se usa --fix-month, --query-month o --empty-month")
         if not re.match(r'^\d{4}-\d{2}$', args.fix_month or args.query_month or args.empty_month):

@@ -8,6 +8,7 @@
     "confirmarEntregaSemanal": "/inv/confirmarEntregaSemanal"
   },
   "ssl": {
-    "verify": false
+    "verify": true,
+    "cafile": "../upload/certs/ssn_cert_20250902.pem"
   }
 }
