@@ -39,21 +39,20 @@ Variables de entorno requeridas (.env):
     SSN_PASSWORD: Contraseña del usuario
     SSN_COMPANY: Código de la compañía
 
-Autor: [Tu Nombre]
-Fecha: Mayo 2025
+Autor: G. Casanova
+Fecha: Septiembre 2025
 """
 
 import sys
 import json
-import requests
 import os
 import argparse
 import shutil
 from dotenv import load_dotenv
 from pathlib import Path
-from urllib.parse import urljoin
 import re
 import logging
+from lib.ssn_client import SSNClient  # TODO: Actualizar a ssn-client en v2.0
 
 # Cargar variables de entorno desde el archivo .env en la raíz del proyecto
 env_path = Path(__file__).resolve().parents[1] / '.env'
@@ -151,158 +150,86 @@ def setup_logging(debug_mode):
     Args:
         debug_mode (bool): Si True, establece el nivel de logging a DEBUG
     """
-    level = logging.DEBUG if debug_mode else logging.INFO
+    # Configuración básica
     logging.basicConfig(
-        level=level,
+        level=logging.DEBUG if debug_mode else logging.WARNING,
         format='%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
 
-def build_url(config, endpoint):
-    """Construye una URL completa para un endpoint.
-    
-    Args:
-        config (dict): Configuración cargada del archivo JSON
-        endpoint (str): Nombre del endpoint en la configuración
-    
-    Returns:
-        str: URL completa
-    """
-    if endpoint not in config['endpoints']:
-        raise ValueError(f"Endpoint '{endpoint}' no encontrado en la configuración")
-    
-    return config['baseUrl'].rstrip('/') + config['endpoints'][endpoint]
+    # Ajustar niveles por logger
+    if not debug_mode:
+        # En modo no-debug, solo mostramos WARNING y superior
+        for logger_name in ['httpx', 'httpcore', 'urllib3', 'ssn_client']:
+            logging.getLogger(logger_name).setLevel(logging.WARNING)
+    else:
+        # En modo debug, configuramos niveles específicos
+        logging.getLogger('ssn_client').setLevel(logging.DEBUG)
+        for logger_name in ['httpx', 'httpcore', 'urllib3']:
+            logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 def authenticate(config, debug_enabled):
     """
-    Autenticación en el servicio de SSN.
-    :param config: Diccionario con la configuración operativa.
-    :param debug_enabled: Booleano que indica si la depuración está habilitada.
-    :return: Token de autenticación.
-    """
-    # Obtener credenciales desde variables de entorno
-    user = os.getenv('SSN_USER')
-    password = os.getenv('SSN_PASSWORD')
-    company = os.getenv('SSN_COMPANY')
-
-    if not all([user, password, company]):
-        raise RuntimeError("Faltan variables de entorno. Asegúrate de que SSN_USER, SSN_PASSWORD y SSN_COMPANY estén definidas en el archivo .env")
-
-    # Construir URL completa desde la configuración
-    url = build_url(config, "login")
-    payload = {
-        "USER": user,
-        "CIA": company,
-        "PASSWORD": password
-    }
-    headers = {"Content-Type": "application/json"}
+    Autenticación en el servicio de SSN usando el cliente HTTP.
     
-    if debug_enabled:
-        print(f"DEBUG: Intentando login en URL: {url}")
-        
-    response = requests.post(url, json=payload, headers=headers)
-    if response.status_code == 200:
-        data = response.json()
-        token = data.get("TOKEN") or data.get("token")
-
-        # DEBUG: Imprimir la respuesta completa
-        if debug_enabled:
-            print("DEBUG: Respuesta de autenticación:\n\r", json.dumps(data, indent=2)) 
-        
-        if not token:
-            raise RuntimeError("No se encontró el TOKEN en la respuesta.")
-        return token
-    else:
-        raise RuntimeError(f"Login fallido: {response.status_code} - {response.text}")
+    Args:
+        config: Diccionario con la configuración operativa
+        debug_enabled: Booleano que indica si la depuración está habilitada
+    
+    Returns:
+        str: Token de autenticación
+    
+    Raises:
+        RuntimeError: Si hay error de autenticación
+    """
+    try:
+        with SSNClient(config, debug=debug_enabled) as client:
+            return client.authenticate()
+    except Exception as e:
+        raise RuntimeError(f"Error de autenticación: {str(e)}")
 
 def enviar_entrega(token, company, records, cronograma, attempt, debug_enabled, config):
-    # Construir URL completa desde la configuración
-    url = build_url(config, "entregaSemanal")
-    headers = {
-        "Content-Type": "application/json",
-        "Token": token
-    }
+    """Envía la entrega semanal al sistema SSN."""
+    try:
+        # Validar y agregar CODIGOCOMPANIA a cada registro
+        for record in records:
+            if not record.get("CODIGOCOMPANIA"):
+                record["CODIGOCOMPANIA"] = company
 
-    # Validar y agregar CODIGOCOMPANIA a cada registro
-    for record in records:
-        if not record.get("CODIGOCOMPANIA"):
-            record["CODIGOCOMPANIA"] = company
+        # Construir el JSON final sin la sección HEADER
+        payload = {
+            "CODIGOCOMPANIA": company,
+            "TIPOENTREGA": "SEMANAL",
+            "CRONOGRAMA": cronograma,
+            "OPERACIONES": records
+        }
 
-    # Construir el JSON final sin la sección HEADER
-    payload = {
-        "CODIGOCOMPANIA": company,
-        "TIPOENTREGA": "SEMANAL",
-        "CRONOGRAMA": cronograma,
-        "OPERACIONES": records
-    }
-
-    # Depurar el JSON enviado solo si la depuración está habilitada y es el primer reintento
-    if debug_enabled and attempt == 1:
-        print("DEBUG: JSON enviado:\n\r", json.dumps(payload, indent=2))
-
-    response = requests.post(url, json=payload, headers=headers)
-    if response.status_code == 200:
-        print(json.dumps({
-            "type": "STATE",
-            "value": {"last_sent": cronograma}
-        }))
-    else:
-        # Extraer y mostrar errores de manera clara
-        try:
-            response_json = response.json()
-            error_details = (
-                response_json.get("errors") or
-                response_json.get("message") or
-                response_json.get("detail") or
-                response.text
-            )
-            error_message = error_details if isinstance(error_details, str) else json.dumps(error_details, indent=2)
-        except Exception as e:
-            error_message = f"No se pudo procesar la respuesta del servidor: {str(e)}\nRespuesta completa: {response.text}"
-        
-        # Mostrar la respuesta del servidor solo en el primer intento fallido
-        if attempt == 1:
-            print("DEBUG: Respuesta del servidor:\n\r", response.text)
-        raise RuntimeError(f"Error al enviar: {response.status_code} - {error_message}")
+        with SSNClient(config, debug=debug_enabled) as client:
+            client.token = token
+            client.post("entregaSemanal", payload)
+            print(json.dumps({
+                "type": "STATE",
+                "value": {"last_sent": cronograma}
+            }))
+            return True
+    except Exception as e:
+        raise RuntimeError(f"Error al enviar entrega semanal: {str(e)}")
 
 def confirmar_entrega(token, company, cronograma, attempt, debug_enabled, config):
     """Confirma la entrega semanal en el sistema de la SSN."""
-    # Construir URL completa desde la configuración
-    url = build_url(config, "confirmarEntregaSemanal")
-    headers = {
-        "Content-Type": "application/json",
-        "Token": token
-    }
-
-    payload = {
-        "CODIGOCOMPANIA": company,
-        "TIPOENTREGA": "SEMANAL",
-        "CRONOGRAMA": cronograma
-    }
-
-    if debug_enabled and attempt == 1:
-        print("DEBUG: JSON de confirmación:\n\r", json.dumps(payload, indent=2))
-
-    response = requests.post(url, json=payload, headers=headers)
-    if response.status_code == 200:
-        print("Entrega semanal confirmada exitosamente.")
-        return True
-    else:
-        try:
-            response_json = response.json()
-            error_details = (
-                response_json.get("errors") or
-                response_json.get("message") or
-                response_json.get("detail") or
-                response.text
-            )
-            error_message = error_details if isinstance(error_details, str) else json.dumps(error_details, indent=2)
-        except Exception as e:
-            error_message = f"No se pudo procesar la respuesta del servidor: {str(e)}\nRespuesta completa: {response.text}"
-        
-        if attempt == 1:
-            print("DEBUG: Respuesta del servidor (confirmación):\n\r", response.text)
-        raise RuntimeError(f"Error al confirmar: {response.status_code} - {error_message}")
+    try:
+        with SSNClient(config, debug=debug_enabled) as client:
+            client.token = token
+            payload = {
+                "CODIGOCOMPANIA": company,
+                "TIPOENTREGA": "SEMANAL",
+                "CRONOGRAMA": cronograma
+            }
+            client.post("confirmarEntregaSemanal", payload)
+            print("Entrega semanal confirmada exitosamente.")
+            return True
+    except Exception as e:
+        raise RuntimeError(f"Error al confirmar: {str(e)}")
 
 def mover_archivo_procesado(data_file):
     """Mueve el archivo JSON procesado a la carpeta processed/weekly/."""
@@ -331,45 +258,19 @@ def fix_semana(token, company, cronograma, attempt, debug_enabled, config):
     Raises:
         RuntimeError: Si hay un error al procesar la solicitud
     """
-    url = build_url(config, "entregaSemanal")
-    headers = {
-        "Content-Type": "application/json",
-        "Token": token
-    }
-    # Body en camelCase como requiere la SSN
-    payload = {
-        "cronograma": cronograma,
-        "codigoCompania": company,
-        "tipoEntrega": "Semanal"
-    }
-    if debug_enabled and attempt == 1:
-        print("DEBUG: JSON de corrección de semana (PUT):\n\r", json.dumps(payload, indent=2))
-    response = requests.put(url, json=payload, headers=headers)
     try:
-        response_json = response.json()
-    except Exception:
-        response_json = {}
-    if response.status_code == 200:
-        print(f"Semana {cronograma} (rectificativa) solicitada exitosamente.")
-        return True
-    error_message = (
-        response_json.get("message") or
-        response_json.get("detail") or
-        response_json.get("errors") or
-        response.text
-    )
-    if not isinstance(error_message, str):
-        error_message = json.dumps(error_message, indent=2, ensure_ascii=False)
-    if debug_enabled and attempt == 1:
-        print("DEBUG: Respuesta del servidor (PUT):\n\r", response.text)
-    if response.status_code == 409:
-        raise RuntimeError(error_message)
-    elif response.status_code == 401:
-        raise RuntimeError("Error de autenticación. Verifique sus credenciales.")
-    elif response.status_code == 403:
-        raise RuntimeError("No tiene permisos para realizar esta operación.")
-    else:
-        raise RuntimeError(f"Error al pedir rectificativa: {error_message}")
+        with SSNClient(config, debug=debug_enabled) as client:
+            client.token = token
+            payload = {
+                "cronograma": cronograma,
+                "codigoCompania": company,
+                "tipoEntrega": "Semanal"
+            }
+            client.put("entregaSemanal", payload)
+            print(f"Semana {cronograma} (rectificativa) solicitada exitosamente.")
+            return True
+    except Exception as e:
+        raise RuntimeError(f"Error al pedir rectificativa: {str(e)}")
 
 def query_semana(token, company, cronograma, attempt, debug_enabled, config):
     """Consulta el estado de una semana específica.
@@ -382,46 +283,21 @@ def query_semana(token, company, cronograma, attempt, debug_enabled, config):
         debug_enabled: Si está en modo debug
         config: Configuración del script
     """
-    url = build_url(config, "entregaSemanal")
-    headers = {
-        "Content-Type": "application/json",
-        "Token": token
-    }    # Construir query params usando camelCase como especifica la documentación
-    params = {
-        "codigoCompania": company,
-        "tipoEntrega": "SEMANAL",
-        "cronograma": cronograma
-    }
-
-    if debug_enabled and attempt == 1:
-        print("DEBUG: Consultando semana con parámetros:\n\r", json.dumps(params, indent=2))
-
-    response = requests.get(url, params=params, headers=headers)
-    if response.status_code == 200:
-        try:
-            data = response.json()
+    try:
+        with SSNClient(config, debug=debug_enabled) as client:
+            client.token = token
+            params = {
+                "codigoCompania": company,
+                "tipoEntrega": "SEMANAL",
+                "cronograma": cronograma
+            }
+            
+            response = client.get("entregaSemanal", params=params)
             print(f"Estado de la semana {cronograma}:")
-            print(json.dumps(data, indent=2, ensure_ascii=False))
+            print(json.dumps(response, indent=2, ensure_ascii=False))
             return True
-        except json.JSONDecodeError:
-            print(f"La respuesta no es un JSON válido: {response.text}")
-            raise RuntimeError("Error al procesar la respuesta del servidor")
-    else:
-        try:
-            response_json = response.json()
-            error_details = (
-                response_json.get("errors") or
-                response_json.get("message") or
-                response_json.get("detail") or
-                response.text
-            )
-            error_message = error_details if isinstance(error_details, str) else json.dumps(error_details, indent=2)
-        except Exception as e:
-            error_message = f"No se pudo procesar la respuesta del servidor: {str(e)}\nRespuesta completa: {response.text}"
-        
-        if attempt == 1:
-            print("DEBUG: Respuesta del servidor:\n\r", response.text)
-        raise RuntimeError(f"Error al consultar semana: {response.status_code} - {error_message}")
+    except Exception as e:
+        raise RuntimeError(f"Error al consultar semana: {str(e)}")
 
 def load_data(data_file):
     """Carga los datos desde un archivo JSON.
@@ -471,59 +347,24 @@ def send_empty_week(token, company, cronograma, attempt, debug_enabled, config):
     Raises:
         RuntimeError: Si hay un error al procesar la solicitud
     """
-    url = build_url(config, "entregaSemanal")
-    headers = {
-        "Content-Type": "application/json",
-        "Token": token
-    }
-
-    # Crear payload con orden específico de campos
-    from collections import OrderedDict
-    payload = OrderedDict([
-        ("CRONOGRAMA", cronograma),
-        ("CODIGOCOMPANIA", company),
-        ("TIPOENTREGA", "SEMANAL"),
-        ("OPERACIONES", [])
-    ])
-
-    if debug_enabled and attempt == 1:
-        print("DEBUG: JSON de semana vacía:\n\r", json.dumps(payload, indent=2))
-
-    response = requests.post(url, json=payload, headers=headers)
-    
-    # Procesar respuesta
     try:
-        response_json = response.json()
-    except Exception:
-        response_json = {}
-
-    # En caso de éxito
-    if response.status_code == 200:
-        print(f"Semana vacía {cronograma} enviada exitosamente.")
-        return True
-        
-    # En caso de error
-    error_message = (
-        response_json.get("message") or
-        response_json.get("detail") or
-        response_json.get("errors") or
-        response.text
-    )
-    
-    if not isinstance(error_message, str):
-        error_message = json.dumps(error_message, indent=2, ensure_ascii=False)
-    
-    if debug_enabled and attempt == 1:
-        print("DEBUG: Respuesta del servidor:\n\r", response.text)
-    
-    if response.status_code == 409:
-        raise RuntimeError(error_message)
-    elif response.status_code == 401:
-        raise RuntimeError("Error de autenticación. Verifique sus credenciales.")
-    elif response.status_code == 403:
-        raise RuntimeError("No tiene permisos para realizar esta operación.")
-    else:
-        raise RuntimeError(f"Error al enviar semana vacía: {error_message}")
+        with SSNClient(config, debug=debug_enabled) as client:
+            client.token = token
+            
+            # Crear payload con orden específico de campos
+            from collections import OrderedDict
+            payload = OrderedDict([
+                ("CRONOGRAMA", cronograma),
+                ("CODIGOCOMPANIA", company),
+                ("TIPOENTREGA", "SEMANAL"),
+                ("OPERACIONES", [])
+            ])
+            
+            client.post("entregaSemanal", payload)
+            print(f"Semana vacía {cronograma} enviada exitosamente.")
+            return True
+    except Exception as e:
+        raise RuntimeError(f"Error al enviar semana vacía: {str(e)}")
 
 def main():
     """Función principal del script."""
@@ -605,7 +446,7 @@ def main():
     except ValueError as e:
         print(f"Error: {str(e)}", file=sys.stderr)
         sys.exit(1)
-    except (requests.exceptions.HTTPError, RuntimeError) as e:
+    except RuntimeError as e:
         # Errores esperados del API o de validación
         print(f"\nError: {str(e)}", file=sys.stderr)
         sys.exit(1)

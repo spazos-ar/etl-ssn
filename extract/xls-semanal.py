@@ -38,8 +38,8 @@ Estructura del Excel requerida:
     - Hoja 'Canje': Operaciones de canje
     - Hoja 'Plazo-Fijo': Operaciones de plazo fijo
 
-Autor: [Tu Nombre]
-Fecha: Mayo 2025
+Autor: G. Casanova
+Fecha: Junio 2025
 """
 
 import pandas as pd
@@ -80,6 +80,13 @@ def load_config():
         config = json.load(f)
     # Sobreescribir xls_path con el valor de línea de comando
     config['xls_path'] = xls_path
+    
+    # Usar SSN_COMPANY desde variables de entorno
+    company = os.getenv('SSN_COMPANY')
+    if not company:
+        raise ValueError("La variable de entorno SSN_COMPANY no está definida")
+    config['company'] = company
+    
     return config
 
 def convert_excel_date(excel_number):

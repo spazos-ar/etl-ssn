@@ -1,23 +1,72 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
 """
-Script actualizado para enviar datos mensuales a la SSN usando directamente el JSON
-generado por xls-mensual.py
+Script para la carga y pr    if args.test:
+        if args.data_file:
+            parser.error("No se debe especificar data_file cuando se usa --test")
+    elif fix_month or args.query_month or args.empty_month:
+        if args.data_file:
+            parser.error("No se debe especificar data_file cuando se usa --fix-month, --query-month o --empty-month")
+        if not re.match(r'^\d{4}-\d{2}$', args.fix_month or args.query_month or args.empty_month):
+            parser.error("El formato debe ser YYYY-MM (ejemplo: 2025-01)")
+    elif not args.data_file and not args.test:
+        parser.error("Debe especificarse el archivo de datos a enviar")ento de datos mensuales al sistema de la SSN.
 
-Autor: Adaptado por ChatGPT
-Fecha: Junio 2025
+Este script maneja el proceso completo de carga de información mensual a la Superintendencia
+de Seguros de la Nación (SSN). Soporta las siguientes operaciones:
+
+1. Envío de datos:
+   - Validación del formato JSON
+   - Envío de datos de inversiones mensuales
+   - Confirmación de la entrega
+   - Movimiento automático de archivos procesados
+
+2. Gestión de entregas:
+   - Consulta de estado (--query-month)
+   - Solicitud de rectificativas (--fix-month)
+   - Envío de meses vacíos (--empty-month)
+   - Confirmación de entregas (--confirm-month)
+
+Uso:
+    python ssn-mensual.py [--config CONFIG] [opciones] [data_file]
+
+Argumentos:
+    data_file: Archivo JSON con los datos a enviar
+    --config: Ruta al archivo de configuración (opcional)
+    --confirm-month: Confirma la entrega y mueve el archivo a processed/
+    --fix-month YYYY-MM: Solicita rectificativa para un mes
+    --query-month YYYY-MM: Consulta estado de un mes
+    --empty-month YYYY-MM: Envía un mes sin inversiones
+
+El archivo de configuración (config.json) debe contener:
+    {
+        "baseUrl": "URL base del servicio",
+        "endpoints": {
+            "login": "ruta del endpoint de login",
+            "entregaMensual": "ruta de entrega mensual",
+            "confirmarEntregaMensual": "ruta de confirmación"
+        },
+        "debug": boolean para modo debug
+    }
+
+Variables de entorno requeridas (.env):
+    SSN_USER: Usuario para autenticación
+    SSN_PASSWORD: Contraseña del usuario
+    SSN_COMPANY: Código de la compañía
+
+Autor: G. Casanova
+Fecha: Septiembre 2025
 """
 
 import sys
 import json
-import requests
 import os
 import argparse
 import shutil
 from dotenv import load_dotenv
 from pathlib import Path
 import re
+from lib.ssn_client import SSNClient  # TODO: Actualizar a ssn-client en v2.0
 
 env_path = Path(__file__).resolve().parents[1] / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -25,6 +74,7 @@ load_dotenv(dotenv_path=env_path)
 def get_args():
     parser = argparse.ArgumentParser(description='Envía datos mensuales a la SSN')
     parser.add_argument('--config', help='Ruta al archivo de configuración')
+    parser.add_argument('--test', action='store_true', help='Prueba la conexión SSL con el servidor')
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--confirm-month', action='store_true', help='Confirma la entrega mensual y mueve el archivo a processed/')
@@ -32,7 +82,7 @@ def get_args():
     group.add_argument('--query-month', metavar='YYYY-MM', help='Consulta el estado de un mes específico (formato YYYY-MM)')
     group.add_argument('--empty-month', metavar='YYYY-MM', help='Envía un mes vacío sin inversiones (formato YYYY-MM)')
 
-    parser.add_argument('data_file', nargs='?', help='Archivo JSON con los datos a enviar (no requerido con --fix-month, --query-month o --empty-month)')
+    parser.add_argument('data_file', nargs='?', help='Archivo JSON con los datos a enviar (no requerido con --fix-month, --query-month, --empty-month o --test)')
     args = parser.parse_args()
 
     if args.fix_month or args.query_month or args.empty_month:
@@ -60,27 +110,20 @@ def get_args():
         config_path = os.path.join(script_dir, 'config-mensual.json')
         if not os.path.isfile(config_path):
             raise FileNotFoundError(f"No se encuentra el archivo de configuración por defecto en '{config_path}'")
-    return config_path, args.data_file, args.confirm_month, args.fix_month, args.query_month, args.empty_month
+    return config_path, args.data_file, args.confirm_month, args.fix_month, args.query_month, args.empty_month, args.test
 
 def load_config(config_path):
     with open(config_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def authenticate(config):
-    user = os.getenv('SSN_USER')
-    password = os.getenv('SSN_PASSWORD')
-    company = os.getenv('SSN_COMPANY')
-    url = config['baseUrl'].rstrip('/') + config['endpoints']['login']
-    response = requests.post(url, json={"USER": user, "CIA": company, "PASSWORD": password}, headers={"Content-Type": "application/json"})
-    data = response.json()
-    print("Respuesta de login:", data)  # Depuración
-    token = data.get('TOKEN') or data.get('token')
-    if not token:
-        raise RuntimeError(f"No se encontró el token en la respuesta: {data}")
-    return token
+    """Autentica con el servicio SSN usando el cliente HTTP."""
+    try:
+        with SSNClient(config, debug=config.get('debug', False)) as client:
+            return client.authenticate()
+    except Exception as e:
+        raise RuntimeError(f"Error de autenticación: {str(e)}")
 
-def build_url(config, endpoint):
-    return config['baseUrl'].rstrip('/') + config['endpoints'][endpoint]
 
 def enviar_entrega(token, data, config):
     # Procesa y valida cada registro en STOCKS
@@ -109,43 +152,29 @@ def enviar_entrega(token, data, config):
                 reg["CANTIDADDEVENGADOESPECIES"] = 0
             if cant_percibida < 0 or cant_percibida > 1e9:
                 reg["CANTIDADPERCIBIDOESPECIES"] = 0
-    url = build_url(config, "entregaMensual")
-    headers = {"Content-Type": "application/json", "Token": token}
-    print("DEBUG: JSON enviado:\n", json.dumps(data, indent=2, ensure_ascii=False))
-    response = requests.post(url, json=data, headers=headers)
-    if response.status_code != 200:
-        print("\nDEBUG: Headers de respuesta:", dict(response.headers))
-        # Manejo de error amigable
-        try:
-            resp_json = response.json()
-            print("DEBUG: Respuesta JSON completa:", json.dumps(resp_json, indent=2, ensure_ascii=False))
-            errors = resp_json.get("errores") or resp_json.get("errors")
-            if errors and isinstance(errors, list):
-                print("\nErrores encontrados:")
-                for error in errors:
-                    print(f"- {error}")
-            else:
-                msg = resp_json.get("message", "") or resp_json.get("detail", "") or response.text
-                print(f"\nError ({response.status_code}): {msg}")
-        except Exception as e:
-            print(f"\nDEBUG: Error al parsear JSON: {str(e)}")
-            print(f"\nError al enviar ({response.status_code}): {response.text}")
-            print("\nDEBUG: Contenido raw de la respuesta:", response.content)
+
+    try:
+        with SSNClient(config, debug=config.get('debug', False)) as client:
+            client.token = token
+            client.post("entregaMensual", data)
+            print("Entrega mensual enviada correctamente.")
+    except Exception as e:
+        print("\nError al enviar entrega mensual:", str(e))
         sys.exit(1)
-    print("Entrega mensual enviada correctamente.")
 
 def confirmar_entrega(token, company, cronograma, config):
-    url = build_url(config, "confirmarEntregaMensual")
-    headers = {"Content-Type": "application/json", "Token": token}
-    payload = {
-        "CODIGOCOMPANIA": company,
-        "TIPOENTREGA": "MENSUAL",
-        "CRONOGRAMA": cronograma
-    }
-    response = requests.post(url, json=payload, headers=headers)
-    if response.status_code != 200:
-        raise RuntimeError(f"Error al confirmar: {response.status_code} - {response.text}")
-    print("Entrega mensual confirmada correctamente.")
+    try:
+        with SSNClient(config, debug=config.get('debug', False)) as client:
+            client.token = token
+            payload = {
+                "CODIGOCOMPANIA": company,
+                "TIPOENTREGA": "MENSUAL",
+                "CRONOGRAMA": cronograma
+            }
+            client.post("confirmarEntregaMensual", payload)
+            print("Entrega mensual confirmada correctamente.")
+    except Exception as e:
+        raise RuntimeError(f"Error al confirmar: {str(e)}")
 
 def mover_archivo_procesado(data_file):
     # Mueve el archivo JSON procesado a data/processed/monthly/
@@ -163,32 +192,22 @@ def mover_archivo_procesado(data_file):
 
 def fix_mes(token, company, cronograma, config):
     """Solicita rectificativa mensual usando PUT con el body requerido por la SSN."""
-    url = build_url(config, "entregaMensual")
-    headers = {"Content-Type": "application/json", "Token": token}
-    payload = {
-        "cronograma": cronograma,
-        "codigoCompania": company,
-        "tipoEntrega": "Mensual"
-    }
-    print("DEBUG: JSON de rectificativa mensual (PUT):\n", json.dumps(payload, indent=2))
-    response = requests.put(url, json=payload, headers=headers)
     try:
-        resp_json = response.json()
-    except Exception:
-        resp_json = {}
-    if response.status_code == 200:
-        print(f"Mes {cronograma} (rectificativa) solicitado exitosamente.")
-        return True
-    error_message = (
-        resp_json.get("message") or
-        resp_json.get("detail") or
-        resp_json.get("errors") or
-        response.text
-    )
-    if not isinstance(error_message, str):
-        error_message = json.dumps(error_message, indent=2, ensure_ascii=False)
-    print("DEBUG: Respuesta del servidor (PUT):\n", response.text)
-    raise RuntimeError(f"Error al pedir rectificativa mensual: {error_message}")
+        with SSNClient(config, debug=config.get('debug', False)) as client:
+            client.token = token
+            payload = {
+                "cronograma": cronograma,
+                "codigoCompania": company,
+                "tipoEntrega": "Mensual"
+            }
+            if config.get('debug', False):
+                client.logger.debug(f"JSON de rectificativa mensual (PUT): {json.dumps(payload, indent=2)}")
+                
+            client.put("entregaMensual", payload)
+            print(f"Mes {cronograma} (rectificativa) solicitado exitosamente.")
+            return True
+    except Exception as e:
+        raise RuntimeError(f"Error al pedir rectificativa mensual: {str(e)}")
 
 def query_mes(token, company, cronograma, config):
     """Consulta el estado de un mes específico.
@@ -199,48 +218,44 @@ def query_mes(token, company, cronograma, config):
         cronograma: Mes a consultar (formato YYYY-MM)
         config: Configuración del script
     """
-    url = build_url(config, "entregaMensual")
-    headers = {"Content-Type": "application/json", "Token": token}
-    
-    # Construir query params usando camelCase como especifica la documentación
-    params = {
-        "codigoCompania": company,
-        "tipoEntrega": "Mensual",
-        "cronograma": cronograma
-    }
-
-    print("DEBUG: Consultando mes con parámetros:\n", json.dumps(params, indent=2))
-    response = requests.get(url, params=params, headers=headers)
-
-    if response.status_code == 200:
-        try:
-            data = response.json()
+    try:
+        with SSNClient(config, debug=config.get('debug', False)) as client:
+            client.token = token
+            params = {
+                "codigoCompania": company,
+                "tipoEntrega": "Mensual",
+                "cronograma": cronograma
+            }
+            
+            # Para debugging
+            if config.get('debug', False):
+                client.logger.debug(f"Parámetros: {json.dumps(params, indent=2)}")
+            
+            response = client.get("entregaMensual", params=params)
             print(f"Estado del mes {cronograma}:")
-            print(json.dumps(data, indent=2, ensure_ascii=False))
+            print(json.dumps(response, indent=2, ensure_ascii=False))
             return True
-        except json.JSONDecodeError:
-            print(f"La respuesta no es un JSON válido: {response.text}")
-            raise RuntimeError("Error al procesar la respuesta del servidor")
-    else:
-        try:
-            resp_json = response.json()
-            error_message = (
-                resp_json.get("errors") or
-                resp_json.get("message") or
-                resp_json.get("detail") or
-                response.text
-            )
-            if not isinstance(error_message, str):
-                error_message = json.dumps(error_message, indent=2, ensure_ascii=False)
-        except Exception as e:
-            error_message = f"No se pudo procesar la respuesta del servidor: {str(e)}\nRespuesta completa: {response.text}"
-        
-        print("DEBUG: Respuesta del servidor:\n", response.text)
-        raise RuntimeError(f"Error al consultar mes: {response.status_code} - {error_message}")
+    except Exception as e:
+        raise RuntimeError(f"Error al consultar mes: {str(e)}")
+
+def test_ssl_connection(config):
+    """Prueba la conexión SSL con el servidor."""
+    try:
+        with SSNClient(config, debug=True) as client:
+            # La inicialización del cliente ya prueba la conexión SSL
+            return True
+    except Exception as e:
+        raise RuntimeError(f"Error en la prueba de conexión SSL: {str(e)}")
 
 def main():
-    config_path, data_file, confirm, fix, query, empty = get_args()
+    config_path, data_file, confirm, fix, query, empty, test = get_args()
     config = load_config(config_path)
+
+    if test:
+        test_ssl_connection(config)
+        print("Conexión SSL verificada correctamente")
+        return
+
     token = authenticate(config)
     company = os.getenv('SSN_COMPANY')
 

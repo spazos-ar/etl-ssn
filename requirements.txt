@@ -1,4 +1,12 @@
-requests
-python-dotenv
+# Cliente HTTP y SSL
+httpx
+certifi
+urllib3
+pyOpenSSL  # Para diagnóstico SSL
+
+# Procesamiento de datos
 pandas
 openpyxl
+
+# Configuración
+python-dotenv

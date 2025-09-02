@@ -80,7 +80,26 @@ python -m venv .venv
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-### 3. Instalar Dependencias
+### 3. Configuración Automática (Recomendado)
+
+La forma más sencilla de completar la instalación es usar el script de configuración automática:
+
+```powershell
+# Con el entorno virtual activado, ejecutar:
+python setup.py
+```
+
+Este script realizará automáticamente:
+- Instalación de dependencias
+- Configuración del certificado SSL
+- Verificación de la conexión
+- Validación de la configuración
+
+### 4. Instalación Manual (Alternativa)
+
+Si prefieres realizar la instalación manualmente o si la configuración automática falla:
+
+#### 4.1 Instalar Dependencias
 
 Con el entorno virtual activado, instala las dependencias:
 
@@ -88,7 +107,43 @@ Con el entorno virtual activado, instala las dependencias:
 pip install -r requirements.txt
 ```
 
-### 4. Configurar Credenciales y Archivos de Configuración
+#### 4.2 Configurar Certificado SSL
+
+Hay tres opciones para configurar el certificado SSL:
+
+##### Opción A: Obtener el certificado automáticamente
+```powershell
+# Obtener el certificado
+python upload/get_cert.py
+
+# El certificado se guardará automáticamente en upload/certs/
+```
+
+##### Opción B: Deshabilitar verificación SSL (NO RECOMENDADO PARA PRODUCCIÓN)
+Edita `upload/config-mensual.json` y `upload/config-semanal.json`:
+```json
+{
+    "ssl": {
+        "verify": false
+    }
+}
+```
+
+##### Opción C: Usar certificado corporativo
+Si tu organización tiene un certificado propio o un proxy HTTPS:
+1. Obtén el certificado de tu organización
+2. Colócalo en `upload/certs/`
+3. Configura la ruta en los archivos de configuración:
+```json
+{
+    "ssl": {
+        "verify": true,
+        "cafile": "certs/certificado_corporativo.pem"
+    }
+}
+```
+
+### 5. Configurar Credenciales y Archivos de Configuración
 
 1. Crea una copia del archivo de ejemplo de configuración:
 ```powershell
@@ -119,7 +174,12 @@ Para verificar que todo esté correctamente instalado:
 
 1. Asegúrate de que el entorno virtual esté activado (verás `(.venv)` al inicio del prompt)
 
-2. Prueba el script de extracción semanal:
+2. Verifica la conexión SSL:
+```powershell
+python upload/ssn-mensual.py --test
+```
+
+3. Prueba el script de extracción semanal:
 ```powershell
 python .\extract\xls-semanal.py --xls-path .\data\datos_semanales.xlsx
 ```
@@ -151,7 +211,9 @@ python .\extract\xls-mensual.py --xls-path .\data\datos_mensuales.xlsx
 - `upload/`: Scripts y configuraciones de carga
   - `ssn-semanal.py`, `ssn-mensual.py`, `config-semanal.json`, `config-mensual.json`
 
-## Actualización de versión
+## Actualización y Desinstalación
+
+### Actualización de versión
 
 Para actualizar el sistema a la última versión disponible en el repositorio:
 
@@ -176,7 +238,62 @@ Este comando va a:
 
 > **Nota**: Si tenés cambios locales que no querés perder, primero tenés que hacer commit de esos cambios o guardarlos temporalmente con `git stash`.
 
+### Desinstalación del Sistema
+
+Para desinstalar completamente el sistema, simplemente elimina el directorio del proyecto:
+
+1. Primero, asegúrate de hacer una copia de seguridad de cualquier dato importante:
+   - Archivos Excel en la carpeta `data/`
+   - Archivo de credenciales `.env`
+   - Archivos de configuración personalizados
+
+2. Cierra cualquier terminal o editor que esté usando el proyecto
+
+3. Elimina el directorio completo:
+```powershell
+# Navega al directorio padre
+cd $HOME\source\repos
+
+# Elimina el directorio del proyecto
+Remove-Item -Recurse -Force etl-ssn
+```
+
+4. (Opcional) Si no vas a volver a usar el sistema, puedes eliminar el repositorio remoto de tus credenciales de Git:
+```powershell
+git config --global --unset credential.helper
+```
+
+Para reinstalar el sistema en el futuro:
+1. Clona nuevamente el repositorio
+2. Sigue las instrucciones de instalación en este documento
+3. Restaura cualquier archivo de configuración o datos que hayas respaldado
+
 ## Solución de Problemas
+
+### Errores SSL
+
+Si obtienes errores relacionados con SSL:
+
+1. Verifica que el certificado esté instalado:
+```powershell
+# Regenerar el certificado
+python upload/get_cert.py
+
+# Probar la conexión
+python upload/ssn-mensual.py --test
+```
+
+2. Si el error persiste:
+   - Verifica que el certificado esté en `upload/certs/`
+   - Verifica que la ruta en la configuración sea correcta
+   - Asegúrate de que el certificado esté actualizado
+
+3. Para más detalles, habilita el modo debug en la configuración:
+```json
+{
+    "debug": true
+}
+```
 
 ### Error: "python no se reconoce como un comando..."
 - Verificá que Python esté en el PATH de Windows
@@ -195,9 +312,30 @@ Este comando va a:
 - Asegurate de tener conexión a Internet
 - Verificá que los endpoints en `upload/config.json` sean correctos
 
+## Mantenimiento
+
+### Actualización de Certificados SSL
+
+Los certificados SSL suelen tener una validez limitada. Para actualizarlos:
+
+1. Regenera el certificado:
+```powershell
+python upload/get_cert.py
+```
+
+2. Verifica la conexión:
+```powershell
+python upload/ssn-mensual.py --test
+```
+
+Si el certificado no se puede obtener automáticamente, sigue las instrucciones en la sección "Opción C: Usar certificado corporativo".
+
 ## Ayuda Adicional
 
 Si encuentras algún problema durante la instalación:
 1. Revisa la [documentación oficial](URL_DEL_REPO)
-2. Crea un issue en el repositorio con los detalles del error
-3. Contacta al equipo de soporte de tu compañía
+2. Habilita el modo debug en la configuración para obtener más detalles
+3. Ejecuta las pruebas de conexión: `python upload/ssn-mensual.py --test`
+4. Verifica los logs en modo debug
+5. Crea un issue en el repositorio con los detalles del error
+6. Contacta al equipo de soporte de tu compañía

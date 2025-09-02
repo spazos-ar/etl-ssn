@@ -32,7 +32,7 @@ Estructura del Excel requerida:
     - Hoja 'Plazo-Fijo': Plazos fijos
     - Hoja 'Cheques': Cheques de pago diferido
 
-Autor: [Tu Nombre]
+Autor: G. Casanova
 Fecha: Junio 2025
 """
 
@@ -69,6 +69,13 @@ def load_config():
     with open(config_path, 'r', encoding='utf-8') as f:
         config = json.load(f)
     config['xls_path'] = xls_path
+    
+    # Usar SSN_COMPANY desde variables de entorno
+    company = os.getenv('SSN_COMPANY')
+    if not company:
+        raise ValueError("La variable de entorno SSN_COMPANY no está definida")
+    config['company'] = company
+    
     return config
 
 def format_date(value):

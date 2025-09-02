@@ -1,10 +1,14 @@
 {
-  "retries": 1,
-  "debug": true,
-  "baseUrl": "https://ri.ssn.gob.ar/api/",
-  "endpoints": {
-    "login": "/login",
-    "entregaMensual": "/inv/entregaMensual",
-    "confirmarEntregaMensual": "/inv/confirmarEntregaMensual"
-  }
+    "retries": 1,
+    "debug": true,
+    "baseUrl": "https://ri.ssn.gob.ar/api",
+    "endpoints": {
+        "authenticate": "/login",
+        "entregaMensual": "/inv/entregaMensual",
+        "confirmarEntregaMensual": "/inv/confirmarEntregaMensual"
+    },
+    "ssl": {
+        "verify": true,
+        "cafile": "certs/ssn_cert_20250901.pem"
+    }
 }
