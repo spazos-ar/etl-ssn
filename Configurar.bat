@@ -9,7 +9,10 @@ if %ERRORLEVEL% neq 0 (
 )
 
 REM Activar entorno virtual
-if exist ".venv\Scripts\activate" call .venv\Scripts\activate
-
-echo Configuración completada y entorno virtual activado.
-echo Ahora podés ejecutar los comandos del sistema ETL SSN.
+REM Para activar el entorno virtual, ejecutá manualmente en la terminal:
+echo Configuración completada!
+echo Para activar el entorno virtual, ejecutá:
+echo .........................................
+echo .      .venv\Scripts\activate           .
+echo .........................................
+echo Activá el entorno virtual antes de ejecutar los comandos del sistema ETL SSN.
