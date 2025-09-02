@@ -1,14 +1,14 @@
 {
-  "retries": 1,
-  "debug": false,
-  "baseUrl": "https://ri.ssn.gob.ar/api",
-  "endpoints": {
-    "authenticate": "/login",
-    "entregaSemanal": "/inv/entregaSemanal",
-    "confirmarEntregaSemanal": "/inv/confirmarEntregaSemanal"
-  },
-  "ssl": {
-    "verify": true,
-    "cafile": "certs/ssn_cert_20250902.pem"
-  }
+    "retries": 1,
+    "debug": false,
+    "baseUrl": "https://ri.ssn.gob.ar/api",
+    "endpoints": {
+        "authenticate": "/login",
+        "entregaSemanal": "/inv/entregaSemanal",
+        "confirmarEntregaSemanal": "/inv/confirmarEntregaSemanal"
+    },
+    "ssl": {
+        "verify": true,
+        "cafile": "certs/ssn_cert_20250902.pem"
+    }
 }

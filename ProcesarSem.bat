@@ -46,17 +46,25 @@ if "%~1"=="fix" (
 
 REM Manejar caso de solo envio
 if "%~1"=="upload" (
-    for %%f in ("!DATA_DIR!\Semana*.json") do (
-        echo Procesando %%~nxf...
-        python .\upload\ssn-semanal.py --confirm-week "%%f"
-        if !ERRORLEVEL! neq 0 (
-            echo Error al procesar %%~nxf
-            exit /b !ERRORLEVEL!
-        )
+    if "%~2"=="" (
+        echo Error: Debe especificar la semana en formato YYYY-WW
+        echo Ejemplo: ProcesarSem.bat upload 2025-15
+        exit /b 1
     )
-    echo Todos los archivos fueron procesados exitosamente
+    set "JSON_FILE=!DATA_DIR!\Semana%~2.json"
+    if not exist "!JSON_FILE!" (
+        echo Error: No se encuentra el archivo !JSON_FILE!
+        exit /b 1
+    )
+    echo Procesando !JSON_FILE!...
+    python .\upload\ssn-semanal.py --confirm-week "!JSON_FILE!"
+    if !ERRORLEVEL! neq 0 (
+        echo Error al procesar !JSON_FILE!
+        exit /b !ERRORLEVEL!
+    )
+    echo El archivo fue procesado exitosamente
     exit /b 0
-)
+}
 
 REM Procesar archivo Excel
 set "EXCEL_FILE=%~1"

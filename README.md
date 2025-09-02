@@ -212,8 +212,8 @@ Podés usar el script batch para automatizar el flujo completo. Opciones:
 # Documentación adicional y soporte
 
 En la carpeta `docs/` vas a encontrar:
-- Especificaciones técnicas del formato requerido por la SSN
-- Ejemplos de archivos de datos para hacer pruebas
+- Especificaciones del formato de datos requerido por la SSN (por versiones actualizadas, visitá el sitio web de la SSN)
+- Ejemplos de archivos Excel de datos para hacer pruebas
 - Guía de instalación detallada para Windows 10/11
 
 Si encontrás algún problema o querés sugerir mejoras, creá un issue en el repositorio.

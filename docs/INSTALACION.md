@@ -2,7 +2,7 @@
 
 Esta guía te va a ayudar a configurar todo lo necesario para ejecutar el sistema ETL SSN en Windows 10/11.
 
-## Prerequisitos
+## Prerrequisitos
 
 ### 1. Instalar Git
 
@@ -133,11 +133,17 @@ Una vez completada la configuración automática, tenés estos comandos listos p
 # Activar entorno virtual (si no está activado)
 .\.venv\Scripts\Activate
 
-# Procesar datos semanales
+# Consultar estado de una semana (año-número de semana)
 .\ProcesarSem.bat query 2025-15
 
-# Procesar datos mensuales  
-.\ProcesarMes.bat upload
+# Enviar datos de una semana (año-número de semana)
+.\ProcesarSem.bat upload 2025-15
+
+# Consultar estado de un mes (año-mes)
+.\ProcesarMes.bat query 2025-05
+
+# Enviar datos de un mes (año-mes)
+.\ProcesarMes.bat upload 2025-05
 ```
 
 ### 4. Instalación Manual (Alternativa)
