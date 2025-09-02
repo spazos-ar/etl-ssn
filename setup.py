@@ -243,19 +243,41 @@ def verify_setup():
         return False
     
     try:
-        # Intentar una conexión de prueba
+        # Primero verificar conexión SSL
         result = subprocess.run(
             [python_path, 'upload/ssn-mensual.py', '--test'],
             capture_output=True,
             text=True
         )
-        if "Conexión SSL verificada correctamente" in result.stdout:
-            print("✓ Conexión segura con la SSN establecida y verificada correctamente")
-            return True
-        else:
+        if "Conexión SSL verificada correctamente" not in result.stdout:
             print("✗ Error en la verificación SSL")
             print(result.stdout)
             return False
+        
+        print("✓ Conexión SSL establecida correctamente")
+        
+        # Ahora verificar credenciales haciendo una consulta real
+        print("✓ Verificando credenciales con la SSN...")
+        result = subprocess.run(
+            [python_path, 'upload/ssn-mensual.py', '--query-month', '2025-01'],
+            capture_output=True,
+            text=True
+        )
+        
+        # Si las credenciales son correctas, debería obtener una respuesta (aunque sea vacía o error de negocio)
+        # Si son incorrectas, fallará la autenticación
+        if "Error de autenticación" in result.stderr or "401" in result.stderr or "Unauthorized" in result.stderr:
+            print("✗ Las credenciales SSN no son válidas")
+            print("Por favor, verifique usuario, contraseña y código de compañía")
+            return False
+        elif "Error" in result.stderr and ("Connection" in result.stderr or "SSL" in result.stderr):
+            print("✗ Error de conectividad con la SSN")
+            print(result.stderr)
+            return False
+        else:
+            print("✓ Credenciales SSN verificadas correctamente")
+            return True
+            
     except Exception as e:
         print(f"✗ Error en la verificación: {e}")
         return False
@@ -305,7 +327,18 @@ Este asistente lo guiará en la configuración inicial del sistema:
         # Verificar configuración
         if verify_setup():
             print("\n🎉 ¡Configuración completada exitosamente! 🎉")
-            print("\n📚 Puede comenzar a usar el sistema. Para más información, consulte docs/INSTALACION.md")
+            print("\nResumen de comandos disponibles:")
+            print("  1️⃣ python extract\\xls-mensual.py   : Procesa datos mensuales")
+            print("  2️⃣ python extract\\xls-semanal.py   : Procesa datos semanales") 
+            print("  3️⃣ python upload\\ssn-mensual.py    : Sube datos mensuales a SSN")
+            print("  4️⃣ python upload\\ssn-semanal.py    : Sube datos semanales a SSN")
+            print("\n🔧 Para usar Python con las dependencias instaladas, use:")
+            print("  1. Para cambiar política de PowerShell (recomendado):")
+            print("     Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser")
+            print("     Luego: .\\.venv\\Scripts\\Activate")
+            print("  2. O ejecute directamente con Python del entorno virtual:")
+            print("     .\\.venv\\Scripts\\python.exe <script>")
+            print("\nPara más información, consulte docs/INSTALACION.md")
         else:
             print("\n❌ La configuración no pudo ser verificada completamente")
             print("⚠️ Por favor, revise los errores anteriores")

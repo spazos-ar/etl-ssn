@@ -1,16 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Script para la carga y pr    if args.test:
-        if args.data_file:
-            parser.error("No se debe especificar data_file cuando se usa --test")
-    elif fix_month or args.query_month or args.empty_month:
-        if args.data_file:
-            parser.error("No se debe especificar data_file cuando se usa --fix-month, --query-month o --empty-month")
-        if not re.match(r'^\d{4}-\d{2}$', args.fix_month or args.query_month or args.empty_month):
-            parser.error("El formato debe ser YYYY-MM (ejemplo: 2025-01)")
-    elif not args.data_file and not args.test:
-        parser.error("Debe especificarse el archivo de datos a enviar")ento de datos mensuales al sistema de la SSN.
+Script para la carga y procesamiento de datos mensuales al sistema de la SSN.
 
 Este script maneja el proceso completo de carga de información mensual a la Superintendencia
 de Seguros de la Nación (SSN). Soporta las siguientes operaciones:
@@ -157,16 +148,18 @@ def enviar_entrega(token, data, config):
                 reg["CANTIDADPERCIBIDOESPECIES"] = 0
 
     try:
+        print("📤 Enviando entrega mensual a la SSN...")
         with SSNClient(config, debug=config.get('debug', False)) as client:
             client.token = token
             client.post("entregaMensual", data)
-            print("Entrega mensual enviada correctamente.")
+            print("✅ Entrega mensual enviada correctamente")
     except Exception as e:
-        print("\nError al enviar entrega mensual:", str(e))
+        print(f"\n❌ Error al enviar entrega mensual: {str(e)}")
         sys.exit(1)
 
 def confirmar_entrega(token, company, cronograma, config):
     try:
+        print("📋 Confirmando entrega mensual...")
         with SSNClient(config, debug=config.get('debug', False)) as client:
             client.token = token
             payload = {
@@ -175,7 +168,7 @@ def confirmar_entrega(token, company, cronograma, config):
                 "CRONOGRAMA": cronograma
             }
             client.post("confirmarEntregaMensual", payload)
-            print("Entrega mensual confirmada correctamente.")
+            print("✅ Entrega mensual confirmada correctamente")
     except Exception as e:
         raise RuntimeError(f"Error al confirmar: {str(e)}")
 
@@ -191,11 +184,12 @@ def mover_archivo_procesado(data_file):
     os.makedirs(processed_dir, exist_ok=True)
     archivo_destino = os.path.join(processed_dir, os.path.basename(data_file))
     shutil.move(data_file, archivo_destino)
-    print(f"Archivo movido exitosamente a: {archivo_destino}")
+    print(f"📁 Archivo movido exitosamente a: {archivo_destino}")
 
 def fix_mes(token, company, cronograma, config):
     """Solicita rectificativa mensual usando PUT con el body requerido por la SSN."""
     try:
+        print(f"🔄 Solicitando rectificativa para el mes {cronograma}...")
         with SSNClient(config, debug=config.get('debug', False)) as client:
             client.token = token
             payload = {
@@ -207,7 +201,7 @@ def fix_mes(token, company, cronograma, config):
                 client.logger.debug(f"JSON de rectificativa mensual (PUT): {json.dumps(payload, indent=2)}")
                 
             client.put("entregaMensual", payload)
-            print(f"Mes {cronograma} (rectificativa) solicitado exitosamente.")
+            print(f"✅ Rectificativa del mes {cronograma} solicitada exitosamente")
             return True
     except Exception as e:
         raise RuntimeError(f"Error al pedir rectificativa mensual: {str(e)}")
@@ -222,6 +216,7 @@ def query_mes(token, company, cronograma, config):
         config: Configuración del script
     """
     try:
+        print(f"📊 Consultando estado del mes {cronograma}...")
         with SSNClient(config, debug=config.get('debug', False)) as client:
             client.token = token
             params = {
@@ -244,7 +239,7 @@ def query_mes(token, company, cronograma, config):
 def test_ssl_connection(config):
     """Prueba la conexión SSL con el servidor."""
     try:
-        with SSNClient(config, debug=True) as client:
+        with SSNClient(config, debug=config.get('debug', False)) as client:
             # La inicialización del cliente ya prueba la conexión SSL
             return True
     except Exception as e:

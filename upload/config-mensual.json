@@ -1,6 +1,6 @@
 {
     "retries": 1,
-    "debug": true,
+    "debug": false,
     "baseUrl": "https://ri.ssn.gob.ar/api",
     "endpoints": {
         "authenticate": "/login",

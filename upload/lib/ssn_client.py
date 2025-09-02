@@ -58,6 +58,10 @@ import logging
 from pathlib import Path
 
 class SSNClient:
+    # Variable de clase para controlar mensajes SSL duplicados
+    _ssl_messages_shown = False
+    _auth_messages_shown = False
+    
     def __init__(self, config: Dict[str, Any], debug: bool = False):
         """
         Inicializa el cliente SSN.
@@ -91,7 +95,10 @@ class SSNClient:
                                      self.config['ssl']['cafile'])
                 if os.path.exists(ca_file):
                     ssl_context.load_verify_locations(cafile=ca_file)
-                    self.logger.info(f"Cargado certificado específico: {ca_file}")
+                    if not self.debug and not SSNClient._ssl_messages_shown:
+                        print("🔐 Certificados de seguridad SSN cargados correctamente")
+                    elif self.debug:
+                        self.logger.info(f"Cargado certificado específico: {ca_file}")
                 else:
                     self.logger.warning(f"No se encontró el archivo de certificado: {ca_file}")
             
@@ -105,11 +112,13 @@ class SSNClient:
                 from OpenSSL import SSL
                 ctx = SSL.Context(SSL.TLS_METHOD)
                 ctx.load_verify_locations(cafile=certifi.where())
-                self.logger.debug("Configuración SSL:")
-                self.logger.debug(f"Certificados cargados de: {certifi.where()}")
-                self.logger.debug(f"Versión mínima TLS: 1.2")
-                self.logger.debug(f"Modo de verificación: CERT_REQUIRED")
-                self.logger.debug(f"Verificación de hostname: Activada")
+                self.logger.debug("🔧 Configuración SSL:")
+                self.logger.debug(f"📁 Certificados cargados de: {certifi.where()}")
+                self.logger.debug(f"🔒 Versión mínima TLS: 1.2")
+                self.logger.debug(f"✅ Modo de verificación: CERT_REQUIRED")
+                self.logger.debug(f"🌐 Verificación de hostname: Activada")
+            elif not SSNClient._ssl_messages_shown:
+                print("🔒 Configurando conexión segura SSL/TLS...")
             
             # Hacemos una prueba de conexión
             test_client = httpx.Client(
@@ -141,7 +150,11 @@ class SSNClient:
             # Si llegamos aquí, la verificación SSL fue exitosa
             self.verify = True
             self.ssl_context = ssl_context
-            self.logger.info("Conexión SSL verificada correctamente")
+            if not self.debug and not SSNClient._ssl_messages_shown:
+                print("✅ Conexión SSL verificada correctamente")
+                SSNClient._ssl_messages_shown = True
+            elif self.debug:
+                self.logger.info("Conexión SSL verificada correctamente")
             
         except Exception as e:
             error_msg = f"Error crítico en la configuración SSL: {str(e)}"
@@ -176,16 +189,19 @@ class SSNClient:
         # Evitamos añadir handlers si ya existen
         if not logging.getLogger().handlers:
             handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s\n')
+            # Sin espacio entre líneas en el formatter
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
             handler.setFormatter(formatter)
             logging.getLogger().addHandler(handler)
             
-        # Configurar niveles de logging
+        # Configurar niveles de logging - modo INFO por defecto para mensajes amigables
         if self.debug:
             self.logger.setLevel(logging.DEBUG)
+            logging.getLogger().setLevel(logging.DEBUG)
         else:
-            # En modo no-debug, solo mostramos WARNING y ERROR
-            self.logger.setLevel(logging.WARNING)
+            # En modo normal, mostramos INFO para mensajes amigables
+            self.logger.setLevel(logging.INFO)
+            logging.getLogger().setLevel(logging.WARNING)
             logging.getLogger('httpx').setLevel(logging.WARNING)
             logging.getLogger('httpcore').setLevel(logging.WARNING)
             logging.getLogger('urllib3').setLevel(logging.WARNING)
@@ -266,7 +282,10 @@ class SSNClient:
         }
         
         try:
-            if self.debug:
+            if not self.debug and not SSNClient._auth_messages_shown:
+                print("🔑 Autenticando con la SSN...")
+                SSNClient._auth_messages_shown = True
+            elif self.debug:
                 self.logger.debug(f"Autenticando en {url}")
                 self.logger.debug(f"Verificación SSL: {'Activada' if self.verify else 'Desactivada'}")
             
@@ -276,6 +295,9 @@ class SSNClient:
             token = data.get('TOKEN') or data.get('token')
             if not token:
                 raise RuntimeError("No se encontró el token en la respuesta")
+            
+            if not self.debug and SSNClient._auth_messages_shown:
+                print("✅ Autenticación exitosa")
             
             self.token = token
             return token

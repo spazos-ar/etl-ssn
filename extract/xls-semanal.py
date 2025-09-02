@@ -640,6 +640,9 @@ def validate_week_format(week_str):
 
 def main():
     try:
+        print("📊 === Procesador de datos semanales SSN ===")
+        print("🔧 Iniciando procesamiento...")
+        
         # Cargar configuración
         config = load_config()
         
@@ -656,11 +659,19 @@ def main():
         if not os.path.isfile(xls_path):
             raise FileNotFoundError(f"No se encuentra el archivo Excel en '{xls_path}'")
             
+        print(f"📁 Leyendo archivo: {os.path.basename(xls_path)}")
+        
         # Leer las hojas del Excel
         df_compra = pd.read_excel(xls_path, sheet_name='Compra')
         df_venta = pd.read_excel(xls_path, sheet_name='Venta')
         df_canje = pd.read_excel(xls_path, sheet_name='Canje')
         df_plazo = pd.read_excel(xls_path, sheet_name='Plazo-Fijo')
+        
+        print("📋 Procesando hojas del Excel:")
+        print(f"  • Compra: {len(df_compra)} operaciones")
+        print(f"  • Venta: {len(df_venta)} operaciones")
+        print(f"  • Canje: {len(df_canje)} operaciones")
+        print(f"  • Plazo-Fijo: {len(df_plazo)} operaciones")
         
         # Procesar cada tipo de operación
         operaciones = []
@@ -674,14 +685,18 @@ def main():
         archivos = guardar_json_por_semana(company, operaciones_por_semana)
         
         # Informar resultado
+        print("✅ Procesamiento completado")
+        total_operaciones = sum(cantidad for _, cantidad in archivos)
+        print(f"📊 Total de operaciones procesadas: {total_operaciones}")
+        print("📄 Archivos generados:")
         for archivo, cantidad in archivos:
-            print(f"Generado {archivo} con {cantidad} operaciones")
+            print(f"  • {archivo}: {cantidad} operaciones")
             
     except (FileNotFoundError, ValueError) as e:
-        print(f"Error: {str(e)}", file=sys.stderr)
+        print(f"❌ Error: {str(e)}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"Error inesperado: {str(e)}", file=sys.stderr)
+        print(f"❌ Error inesperado: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -234,6 +234,9 @@ def process_cheques(df):
 
 def main():
     try:
+        print("📊 === Procesador de datos mensuales SSN ===")
+        print("🔧 Iniciando procesamiento...")
+        
         # Cargar configuración
         config = load_config()
         decimal_separator = config.get('decimal_separator', ',')
@@ -244,34 +247,49 @@ def main():
             raise ValueError("Faltan parámetros obligatorios en la configuración (xls_path, company)")
         if not os.path.isfile(xls_path):
             raise FileNotFoundError(f"No se encuentra el archivo Excel en '{xls_path}'")
+            
+        print(f"📁 Leyendo archivo: {os.path.basename(xls_path)}")
         xls = pd.ExcelFile(xls_path)
         df_inv = pd.read_excel(xls, "Stock-Inversiones")
         df_pf = pd.read_excel(xls, "Stock-Plazo-Fijo")
         df_cheq = pd.read_excel(xls, "Stock-CHPD")
+        
         cronograma = df_inv["CRONOGRAMA"][0]
         # Formato Mes-YYYY-MM.json
         cronograma_str = str(cronograma).replace('_', '-')
         output_filename = f"Mes-{cronograma_str}.json"
         output_path = os.path.join("data", output_filename)
+        
+        print("📋 Procesando hojas del Excel:")
+        print(f"  • Stock-Inversiones: {len(df_inv)} registros")
+        print(f"  • Stock-Plazo-Fijo: {len(df_pf)} registros")  
+        print(f"  • Stock-CHPD: {len(df_cheq)} registros")
+        
         all_records = []
         all_records += process_inversiones(df_inv)
         all_records += process_plazo_fijo(df_pf)
         all_records += process_cheques(df_cheq)
+        
         output = {
             "CODIGOCOMPANIA": company,
             "TIPOENTREGA": "MENSUAL",
             "CRONOGRAMA": cronograma,
             "STOCKS": all_records
         }
+        
         os.makedirs("data", exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(output, f, indent=2, ensure_ascii=False)
-        print(f"Archivo generado: {output_path}")
+            
+        print(f"✅ Procesamiento completado")
+        print(f"📄 Archivo generado: {output_path}")
+        print(f"📊 Total de registros procesados: {len(all_records)}")
+        
     except (FileNotFoundError, ValueError) as e:
-        print(f"Error: {str(e)}", file=sys.stderr)
+        print(f"❌ Error: {str(e)}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"Error inesperado: {str(e)}", file=sys.stderr)
+        print(f"❌ Error inesperado: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":

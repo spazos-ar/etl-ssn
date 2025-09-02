@@ -288,6 +288,7 @@ def query_semana(token, company, cronograma, attempt, debug_enabled, config):
         config: Configuración del script
     """
     try:
+        print(f"📊 Consultando estado de la semana {cronograma}...")
         with SSNClient(config, debug=debug_enabled) as client:
             client.token = token
             params = {
