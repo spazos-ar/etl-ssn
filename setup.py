@@ -50,8 +50,8 @@ def setup_ssl_cert():
     cert_dir = Path('upload/certs')
     cert_dir.mkdir(parents=True, exist_ok=True)
     
-    print("Obteniendo certificado SSL de la SSN...")
     try:
+        # Ejecutar script para obtener el certificado
         subprocess.check_call([python_path, 'upload/get_cert.py'])
         
         # Mover el certificado a la carpeta correcta
@@ -59,17 +59,23 @@ def setup_ssl_cert():
         if cert_files:
             latest_cert = max(cert_files, key=lambda x: x.stat().st_mtime)
             dest_path = cert_dir / latest_cert.name
+            
+            # Si el archivo ya existe, lo eliminamos primero
+            if dest_path.exists():
+                dest_path.unlink()
+            
             latest_cert.rename(dest_path)
-            print(f"Certificado guardado en: {dest_path}")
+            print(f"📁 Certificado guardado en: {dest_path}")
             
             # Actualizar la configuración
             update_config(latest_cert.name)
+            print("⚙️  Configuración actualizada correctamente")
         else:
-            print("ADVERTENCIA: No se pudo obtener el certificado automáticamente.")
-            print("Por favor, siga las instrucciones en docs/INSTALACION.md para la configuración manual.")
+            print("❌ No se pudo obtener el certificado automáticamente.")
+            print("📝 Por favor, siga las instrucciones en docs/INSTALACION.md para la configuración manual.")
     except Exception as e:
-        print(f"Error al obtener el certificado: {e}")
-        print("Por favor, siga las instrucciones en docs/INSTALACION.md para la configuración manual.")
+        print(f"❌ Error al configurar el certificado: {e}")
+        print("📝 Por favor, siga las instrucciones en docs/INSTALACION.md para la configuración manual.")
 
 def update_config(cert_filename):
     """Actualiza los archivos de configuración con el nuevo certificado."""
@@ -99,6 +105,87 @@ def update_config(cert_filename):
                 f.write(content)
             print(f"Configuración actualizada: {config_file}")
 
+def get_masked_input(prompt):
+    """Lee la entrada del usuario mostrando asteriscos. Compatible con Windows y Linux."""
+    import sys
+    import platform
+    
+    # Determinar el sistema operativo
+    if platform.system() == 'Windows':
+        return _get_masked_input_windows(prompt)
+    else:
+        return _get_masked_input_unix(prompt)
+
+def _get_masked_input_windows(prompt):
+    """Implementación para Windows usando msvcrt."""
+    import msvcrt
+    
+    print(prompt, end='', flush=True)
+    password = []
+    
+    while True:
+        char = msvcrt.getwch()  # Lee un caracter sin mostrarlo
+        
+        if char == '\r' or char == '\n':  # Enter
+            print()  # Nueva línea
+            break
+        elif char == '\b':  # Backspace
+            if password:
+                password.pop()
+                # Borra el último asterisco
+                sys.stdout.write('\b \b')
+                sys.stdout.flush()
+        else:
+            password.append(char)
+            # Muestra un asterisco
+            sys.stdout.write('*')
+            sys.stdout.flush()
+    
+    return ''.join(password)
+
+def _get_masked_input_unix(prompt):
+    """Implementación para sistemas Unix/Linux usando termios."""
+    import termios
+    import tty
+    
+    print(prompt, end='', flush=True)
+    password = []
+    
+    # Guardar configuración actual de la terminal
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    
+    try:
+        # Configurar la terminal para lectura char por char
+        tty.setraw(fd)
+        
+        while True:
+            char = sys.stdin.read(1)
+            
+            if char == '\r' or char == '\n':  # Enter
+                sys.stdout.write('\n')
+                sys.stdout.flush()
+                break
+            elif char == '\x7f':  # Backspace en Unix
+                if password:
+                    password.pop()
+                    # Borra el último asterisco
+                    sys.stdout.write('\b \b')
+                    sys.stdout.flush()
+            elif char == '\x03':  # Ctrl+C
+                raise KeyboardInterrupt
+            else:
+                password.append(char)
+                # Muestra un asterisco
+                sys.stdout.write('*')
+                sys.stdout.flush()
+                
+    finally:
+        # Restaurar configuración original de la terminal
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    
+    return ''.join(password)
+
 def setup_env_file():
     """Configura el archivo .env con las credenciales del usuario."""
     print("\n=== Configuración de credenciales ===")
@@ -110,10 +197,10 @@ def setup_env_file():
         print("El usuario es obligatorio.")
         user = input("Usuario SSN: ").strip()
     
-    password = input("Contraseña SSN: ").strip()
+    password = get_masked_input("Contraseña SSN: ").strip()
     while not password:
         print("La contraseña es obligatoria.")
-        password = input("Contraseña SSN: ").strip()
+        password = get_masked_input("Contraseña SSN: ").strip()
     
     company = input("Código de compañía (4 dígitos): ").strip()
     while not (company.isdigit() and len(company) == 4):
@@ -163,7 +250,7 @@ def verify_setup():
             text=True
         )
         if "Conexión SSL verificada correctamente" in result.stdout:
-            print("✓ Configuración SSL verificada correctamente")
+            print("✓ Conexión segura con la SSN establecida y verificada correctamente")
             return True
         else:
             print("✗ Error en la verificación SSL")
@@ -176,55 +263,58 @@ def verify_setup():
 def main():
     """Función principal de configuración."""
     print("""
-=== Configuración inicial del proyecto ETL-SSN ===
+🔧 === Configuración inicial del proyecto ETL-SSN === 🔧
 
 Este asistente lo guiará en la configuración inicial del sistema:
-1. Creación del entorno virtual Python
-2. Instalación de dependencias
-3. Configuración de credenciales SSN
-4. Configuración del certificado SSL
-5. Verificación de la configuración
+1. 🐍 Creación del entorno virtual Python
+2. 📦 Instalación de dependencias
+3. 🔑 Configuración de credenciales SSN
+4. 🔒 Configuración del certificado de seguridad
+5. ✅ Verificación de la configuración
 """)
     
     input("Presione Enter para comenzar...")
     
-    print("\n=== Paso 1: Configuración del entorno virtual ===")
+    print("\n🐍 === Paso 1: Configuración del entorno virtual ===")
     # Crear entorno virtual si no existe
     if create_venv():
-        print("✓ Entorno virtual creado")
+        print("✅ Entorno virtual creado correctamente")
     else:
-        print("✓ Entorno virtual ya existe")
+        print("✅ Entorno virtual ya existe y está listo para usar")
     
     try:
-        print("\n=== Paso 2: Instalación de dependencias ===")
+        print("\n📦 === Paso 2: Instalación de dependencias ===")
         # Instalar dependencias
         install_requirements()
-        print("✓ Dependencias instaladas")
+        print("✅ Todas las dependencias han sido instaladas correctamente")
         
-        print("\n=== Paso 3: Configuración de credenciales ===")
+        print("\n🔑 === Paso 3: Configuración de credenciales ===")
         # Configurar archivo .env
         if not setup_env_file():
             print("\n⚠️ La configuración de credenciales fue cancelada")
-            print("Para completar la configuración manualmente, siga las instrucciones en docs/INSTALACION.md")
+            print("📝 Para completar la configuración manualmente, siga las instrucciones en docs/INSTALACION.md")
             sys.exit(1)
         
-        print("\n=== Paso 4: Configuración SSL ===")
+        print("\n🔒 === Paso 4: Configuración del certificado de seguridad ===")
+        print("🌐 Conectando con la SSN para obtener el certificado de seguridad...")
         # Configurar certificado SSL
         setup_ssl_cert()
+        print("\n✅ El certificado se ha configurado correctamente para comunicarse de forma segura con la SSN")
         
-        print("\n=== Paso 5: Verificación final ===")
+        print("\n🎯 === Paso 5: Verificación final ===")
         # Verificar configuración
         if verify_setup():
-            print("\n✨ ¡Configuración completada exitosamente! ✨")
-            print("\nPuede comenzar a usar el sistema. Para más información, consulte docs/INSTALACION.md")
+            print("\n🎉 ¡Configuración completada exitosamente! 🎉")
+            print("\n📚 Puede comenzar a usar el sistema. Para más información, consulte docs/INSTALACION.md")
         else:
-            print("\n⚠️ La configuración no pudo ser verificada completamente")
-            print("Por favor, revise los errores anteriores y consulte docs/INSTALACION.md")
+            print("\n❌ La configuración no pudo ser verificada completamente")
+            print("⚠️ Por favor, revise los errores anteriores")
+            print("📝 Para más ayuda, consulte docs/INSTALACION.md")
             sys.exit(1)
         
     except Exception as e:
-        print(f"\n✗ Error durante la configuración: {e}")
-        print("Por favor, consulte docs/INSTALACION.md para instrucciones de configuración manual")
+        print(f"\n❌ Error durante la configuración: {e}")
+        print("📝 Por favor, consulte docs/INSTALACION.md para instrucciones de configuración manual")
         sys.exit(1)
 
 if __name__ == "__main__":

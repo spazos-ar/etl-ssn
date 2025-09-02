@@ -9,6 +9,6 @@
   },
   "ssl": {
     "verify": true,
-    "cafile": "../upload/certs/ssn_cert_20250902.pem"
+    "cafile": "certs/ssn_cert_20250902.pem"
   }
 }
