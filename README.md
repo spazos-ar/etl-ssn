@@ -14,10 +14,10 @@ python setup.py
 ```
 
 **¡Eso es todo!** 🎉 El script `setup.py` se encarga de:
-- ✅ Crear y activar el entorno virtual
+- ✅ Crear el entorno virtual (.venv)
 - ✅ Instalar todas las dependencias necesarias (incluyendo dotenv)
 - ✅ Configurar el certificado SSL automáticamente  
-- ✅ Solicitar y validar tus credenciales del SSN
+- ✅ Validar tus credenciales de SSN con el endpoint de login
 - ✅ Crear el archivo `.env` con la configuración
 - ✅ Verificar la conexión con el sistema SSN
 
