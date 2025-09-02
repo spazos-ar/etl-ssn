@@ -19,6 +19,18 @@ import subprocess
 import platform
 from pathlib import Path
 
+# Configurar la codificación para sistemas Windows
+if platform.system() == "Windows":
+    # Forzar UTF-8 para stdout y stderr
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    # Configurar la consola para UTF-8 si es posible
+    try:
+        os.system('chcp 65001 >nul 2>&1')
+    except:
+        pass
+
 def create_venv():
     """Crea el entorno virtual si no existe."""
     venv_dir = Path('.venv')
@@ -40,7 +52,8 @@ def install_requirements():
     """Instala las dependencias del proyecto."""
     python_path = get_python_path()
     print("Instalando dependencias...")
-    subprocess.check_call([python_path, '-m', 'pip', 'install', '-r', 'requirements.txt'])
+    subprocess.check_call([python_path, '-m', 'pip', 'install', '-r', 'requirements.txt'], 
+                         encoding='utf-8', errors='replace')
 
 def setup_ssl_cert():
     """Configura el certificado SSL."""
@@ -52,7 +65,8 @@ def setup_ssl_cert():
     
     try:
         # Ejecutar script para obtener el certificado
-        subprocess.check_call([python_path, 'upload/get_cert.py'])
+        subprocess.check_call([python_path, 'upload/get_cert.py'], 
+                             encoding='utf-8', errors='replace')
         
         # Mover el certificado a la carpeta correcta
         cert_files = list(Path('.').glob('ssn_cert_*.pem'))
@@ -220,8 +234,7 @@ SSN_COMPANY={company}
     
     env_path = Path('.env')
     if env_path.exists():
-        print("\n⚠️ El archivo .env ya existe. ¿Desea sobrescribirlo? (s/n)")
-        response = input().lower().strip()
+        response = input("\n⚠️ El archivo .env ya existe. ¿Desea sobrescribirlo? (s/n): ").lower().strip()
         if response != 's':
             print("Configuración de credenciales cancelada.")
             return False
@@ -247,11 +260,17 @@ def verify_setup():
         result = subprocess.run(
             [python_path, 'upload/ssn-mensual.py', '--test'],
             capture_output=True,
-            text=True
+            text=True,
+            encoding='utf-8',
+            errors='replace'
         )
-        if "Conexión SSL verificada correctamente" not in result.stdout:
+        stdout = result.stdout or ""
+        stderr = result.stderr or ""
+        
+        if "Conexión SSL verificada correctamente" not in stdout:
             print("✗ Error en la verificación SSL")
-            print(result.stdout)
+            print(stdout)
+            print(stderr)
             return False
         
         print("✓ Conexión SSL establecida correctamente")
@@ -261,20 +280,52 @@ def verify_setup():
         result = subprocess.run(
             [python_path, 'upload/ssn-mensual.py', '--query-month', '2025-01'],
             capture_output=True,
-            text=True
+            text=True,
+            encoding='utf-8',
+            errors='replace'
         )
         
-        # Si las credenciales son correctas, debería obtener una respuesta (aunque sea vacía o error de negocio)
-        # Si son incorrectas, fallará la autenticación
-        if "Error de autenticación" in result.stderr or "401" in result.stderr or "Unauthorized" in result.stderr:
+        stdout = result.stdout or ""
+        stderr = result.stderr or ""
+        
+        # Verificar si hay errores de autenticación en stdout o stderr
+        auth_error_indicators = [
+            "Error de autenticación",
+            "401",
+            "Unauthorized",
+            "Authentication failed",
+            "Invalid credentials",
+            "Login failed"
+        ]
+        
+        # Buscar indicadores de error de autenticación en ambas salidas
+        auth_error_found = any(
+            indicator in stdout or indicator in stderr 
+            for indicator in auth_error_indicators
+        )
+        
+        # Si el comando falló (return code != 0) y hay indicios de error de autenticación
+        if result.returncode != 0 and auth_error_found:
             print("✗ Las credenciales SSN no son válidas")
-            print("Por favor, verifique usuario, contraseña y código de compañía")
+            print("⚠️ Por favor, verifique usuario, contraseña y código de compañía")
+            # Mostrar el error específico
+            if "Error de autenticación" in stdout:
+                error_line = next((line for line in stdout.split('\n') if "Error de autenticación" in line), "")
+                if error_line:
+                    print(f"Detalle: {error_line}")
             return False
-        elif "Error" in result.stderr and ("Connection" in result.stderr or "SSL" in result.stderr):
-            print("✗ Error de conectividad con la SSN")
-            print(result.stderr)
+        elif result.returncode != 0:
+            # Error general (no de autenticación)
+            print("✗ Error en la verificación de credenciales")
+            if stderr.strip():
+                print(f"Error: {stderr}")
+            elif "Error:" in stdout:
+                error_line = next((line for line in stdout.split('\n') if "Error:" in line), "")
+                if error_line:
+                    print(f"Detalle: {error_line}")
             return False
         else:
+            # Comando exitoso (return code = 0)
             print("✓ Credenciales SSN verificadas correctamente")
             return True
             
@@ -334,15 +385,15 @@ Este asistente lo guiará en la configuración inicial del sistema:
             print("  4️⃣ python upload\\ssn-semanal.py    : Sube datos semanales a SSN")
             print("\n🔧 Para usar Python con las dependencias instaladas, use:")
             print("  1. Para cambiar política de PowerShell (recomendado):")
-            print("     Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser")
-            print("     Luego: .\\.venv\\Scripts\\Activate")
+            print("     🏃▶️ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser")
+            print("     🏃▶️ Luego: .\\.venv\\Scripts\\Activate")
             print("  2. O ejecute directamente con Python del entorno virtual:")
-            print("     .\\.venv\\Scripts\\python.exe <script>")
-            print("\nPara más información, consulte docs/INSTALACION.md")
+            print("     🏃▶️ .\\.venv\\Scripts\\python.exe <script>")
+            print("\nPara más información, consulte docs/INSTALACION.md\n\r")
         else:
             print("\n❌ La configuración no pudo ser verificada completamente")
             print("⚠️ Por favor, revise los errores anteriores")
-            print("📝 Para más ayuda, consulte docs/INSTALACION.md")
+            print("📝 Para más ayuda, consulte docs/INSTALACION.md\n\r")
             sys.exit(1)
         
     except Exception as e:

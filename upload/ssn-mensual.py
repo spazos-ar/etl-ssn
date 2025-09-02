@@ -49,6 +49,22 @@ Autor: G. Casanova
 Fecha: Septiembre 2025
 """
 
+import os
+import sys
+import platform
+
+# Configurar la codificación para sistemas Windows
+if platform.system() == "Windows":
+    # Forzar UTF-8 para stdout y stderr
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    # Configurar la consola para UTF-8 si es posible
+    try:
+        os.system('chcp 65001 >nul 2>&1')
+    except:
+        pass
+
 import sys
 import json
 import os
@@ -251,7 +267,6 @@ def main():
 
     if test:
         test_ssl_connection(config)
-        print("Conexión SSL verificada correctamente")
         return
 
     token = authenticate(config)

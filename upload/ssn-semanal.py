@@ -48,7 +48,20 @@ import json
 import os
 import argparse
 import shutil
+import platform
 from dotenv import load_dotenv
+
+# Configurar la codificación para sistemas Windows
+if platform.system() == "Windows":
+    # Forzar UTF-8 para stdout y stderr
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    # Configurar la consola para UTF-8 si es posible
+    try:
+        os.system('chcp 65001 >nul 2>&1')
+    except:
+        pass
 from pathlib import Path
 import re
 import logging
@@ -374,11 +387,12 @@ def send_empty_week(token, company, cronograma, attempt, debug_enabled, config):
 def test_ssl_connection(config):
     """Prueba la conexión SSL con el servidor."""
     try:
-        with SSNClient(config, debug=True) as client:
+        with SSNClient(config, debug=False) as client:
             # La inicialización del cliente ya prueba la conexión SSL
+            # Los mensajes se muestran automáticamente desde el SSNClient
             return True
     except Exception as e:
-        raise RuntimeError(f"Error en la prueba de conexión SSL: {str(e)}")
+        raise RuntimeError(f"Error crítico en la configuración SSL: {str(e)} Por favor, verifique la configuración SSL.")
 
 def main():
     """Función principal del script."""
@@ -393,7 +407,6 @@ def main():
         # Verificar si se solicitó una prueba de conexión SSL
         if test:
             test_ssl_connection(config)
-            print("Conexión SSL verificada correctamente")
             return
         
         # Configurar logging

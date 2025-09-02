@@ -2,7 +2,22 @@ import ssl
 import socket
 import certifi
 import logging
+import os
+import sys
+import platform
 from datetime import datetime
+
+# Configurar la codificación para sistemas Windows
+if platform.system() == "Windows":
+    # Forzar UTF-8 para stdout y stderr
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    # Configurar la consola para UTF-8 si es posible
+    try:
+        os.system('chcp 65001 >nul 2>&1')
+    except:
+        pass
 
 def get_server_certificate(hostname, port=443):
     logging.basicConfig(level=logging.INFO, format='%(message)s')
