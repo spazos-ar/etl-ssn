@@ -67,7 +67,7 @@ Para una guía detallada de instalación en Windows 10/11, consultá [docs/INSTA
 
 ---
 
-# Flujo de trabajo SEMANAL
+# 📊 Flujo de trabajo SEMANAL
 
 ## 1. Extracción de datos semanales
 
@@ -124,7 +124,7 @@ Podés usar el script batch para automatizar el flujo completo. Opciones:
 
 ---
 
-# Flujo de trabajo MENSUAL
+# 📅 Flujo de trabajo MENSUAL
 
 ## 1. Extracción de datos mensuales
 
@@ -189,7 +189,7 @@ Podés usar el script batch para automatizar el flujo completo. Opciones:
 
 ---
 
-# Archivos de configuración
+# ⚙️ Archivos de configuración
 
 - `extract/config-semanal.json`: Configuración del proceso de extracción semanal
 - `extract/config-mensual.json`: Configuración del proceso de extracción mensual
@@ -198,7 +198,7 @@ Podés usar el script batch para automatizar el flujo completo. Opciones:
 
 ---
 
-# Estructura de carpetas
+# 📂 Estructura de carpetas
 
 - `data/`: Archivos de datos de entrada y salida
   - `datos_semanales.xlsx`, `datos_mensuales.xlsx`
@@ -209,7 +209,7 @@ Podés usar el script batch para automatizar el flujo completo. Opciones:
 
 ---
 
-# Documentación adicional y soporte
+# 🔧 Documentación adicional y soporte
 
 En la carpeta `docs/` vas a encontrar:
 - Especificaciones del formato de datos requerido por la SSN (por versiones actualizadas, visitá el sitio web de la SSN)
