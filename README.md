@@ -1,6 +1,6 @@
 # ETL SSN
 
-Sistema de extracción y carga de datos para la Superintendencia de Seguros de la Nación (SSN). Este proyecto automatiza el proceso de carga de información semanal y mensual requerida por la SSN, facilitando el cumplimiento de las obligaciones regulatorias de las compañías de seguros.
+Sistema de extracción y carga de datos de inversiones en los servicios de la Superintendencia de Seguros de la Nación (SSN). Este proyecto automatiza el proceso de carga de información semanal y mensual requerida por la SSN, facilitando el cumplimiento de las obligaciones regulatorias de las compañías de seguros.
 
 ---
 
