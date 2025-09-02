@@ -1,57 +1,170 @@
-# Excluir archivos de credenciales y configuraciones sensibles
+# =============================================================================
+# Credenciales y configuraciones sensibles
+# =============================================================================
 .env
 !.env.example
 *.ini
+*.cfg
 
-# Excluir archivos JSON de datos (pero NO los de configuración)
+# =============================================================================
+# Certificados SSL y archivos de seguridad
+# =============================================================================
+*.pem
+*.crt
+*.key
+*.cer
+upload/certs/*
+!upload/certs/.gitkeep
+
+# =============================================================================
+# Archivos de datos y procesamiento
+# =============================================================================
+# Archivos Excel de entrada
+data/*.xlsx
+data/**/*.xlsx
+
+# JSONs generados (pero NO los de configuración)
 data/**/*.json
 data/*.json
+processed/**/*.json
+processed/*.json
 
 # Incluir explícitamente los archivos de configuración JSON
-!extract/config.json
 !extract/config-semanal.json
 !extract/config-mensual.json
-!upload/config.json
 !upload/config-semanal.json
 !upload/config-mensual.json
 !docs/*.json
 
-# Archivos de caché de Python
-__pycache__/
-*.py[cod]
-
-# Archivos de logs
-*.log
-
-# Archivos de datos temporales
+# Archivos temporales y de procesamiento
 *.tmp
 *.temp
-
-# Archivos de salida de pruebas
+*.bak
+*.swp
 *.out
 *.err
 
-# Archivos de Excel y otros datos
-*.xlsx
-
-# Archivos de configuración de IDE
-.vscode/
-.idea/
-
-# Archivos de sistema
-.DS_Store
-Thumbs.db
-
-# Excluir binarios
-*.exe
-*.dll
+# =============================================================================
+# Python y entornos virtuales
+# =============================================================================
+# Caché y compilados
+__pycache__/
+*.py[cod]
+*$py.class
 *.so
-*.dylib
+.Python
 
-# Excluir dependencias instaladas
-venv/
+# Distribución y empaquetado
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Entornos virtuales (todas las variantes posibles)
 .env/
+.venv/
+env/
+venv/
+ENV/
+virtualenv/
+.virtualenv/
+.python-version  # pyenv
+pyvenv.cfg
+pip-selfcheck.json
+bin/  # virtualenv en Unix
+include/  # virtualenv en Unix
+lib64/  # virtualenv en Unix
+Scripts/  # virtualenv en Windows
+Lib/  # virtualenv en Windows
+tcl/  # virtualenv en Windows
 
-# Excluir archivos de Singer ETL
-state.json
-catalog.json
+# Testing y cobertura
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# =============================================================================
+# IDEs y editores
+# =============================================================================
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# PyCharm y otros JetBrains
+.idea/
+*.iml
+*.iws
+.idea_modules/
+
+# Otros editores
+*.sublime-workspace
+*.sublime-project
+.project
+.classpath
+.settings/
+*.code-workspace
+
+# =============================================================================
+# Sistema operativo
+# =============================================================================
+# Windows
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# Logs y debugging
+# =============================================================================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pip-log.txt
+pip-delete-this-directory.txt

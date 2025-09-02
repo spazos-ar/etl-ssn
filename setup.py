@@ -7,6 +7,9 @@ Este script:
 2. Instala las dependencias
 3. Obtiene y configura el certificado SSL
 4. Verifica la configuración
+
+Autor: G. Casanova
+Fecha: Septiembre 2025
 """
 
 import os
