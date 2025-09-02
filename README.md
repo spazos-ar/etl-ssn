@@ -6,9 +6,21 @@ Sistema de extracción y carga de datos de inversiones en los servicios de la Su
 
 ## 🚀 Instalación y configuración
 
-### ¿Qué hacer después de clonar el repositorio?
+### Si ya tenés instalados los prerrequisitos de software
+(Si nos los tenés, revisá la [guía detallada](docs/INSTALACION.md)).
 
-**Paso 1**: Ejecutá la configuración automática:
+**Paso 1**: Cloná este repositorio en tu computadora:
+```powershell
+# Crear carpeta y navegar
+New-Item -ItemType Directory -Force -Path "$HOME\source\repos"
+cd $HOME\source\repos
+
+# Clonar proyecto
+git clone https://github.com/spazos-ar/etl-ssn.git
+cd etl-ssn
+```
+
+**Paso 2**: Ejecutá la configuración automática:
 ```powershell
 python setup.py
 ```
