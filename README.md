@@ -4,7 +4,39 @@ Sistema de extracción y carga de datos para la Superintendencia de Seguros de l
 
 ---
 
-## Instalación y configuración
+## 🚀 Instalación y configuración
+
+### ¿Qué hacer después de clonar el repositorio?
+
+**Paso 1**: Ejecutá la configuración automática:
+```powershell
+python setup.py
+```
+
+**¡Eso es todo!** 🎉 El script `setup.py` se encarga de:
+- ✅ Crear y activar el entorno virtual
+- ✅ Instalar todas las dependencias necesarias (incluyendo dotenv)
+- ✅ Configurar el certificado SSL automáticamente  
+- ✅ Solicitar y validar tus credenciales del SSN
+- ✅ Crear el archivo `.env` con la configuración
+- ✅ Verificar la conexión con el sistema SSN
+
+### Comandos disponibles después de la instalación:
+
+Después de ejecutar `python setup.py`, tenés estos comandos disponibles:
+
+```powershell
+# Activar entorno virtual (si no está activado)
+.\.venv\Scripts\Activate
+
+# Procesar datos semanales
+.\ProcesarSem.bat query 2025-15
+
+# Procesar datos mensuales  
+.\ProcesarMes.bat upload
+```
+
+### Instalación manual (solo si setup.py falla):
 
 1. **Instalá las dependencias del proyecto:**
    ```powershell
@@ -18,7 +50,8 @@ Sistema de extracción y carga de datos para la Superintendencia de Seguros de l
      SSN_PASSWORD=tu_contraseña
      SSN_COMPANY=tu_codigo_compania
      ```
-3. Para una guía detallada de instalación en Windows 10/11, consultá [docs/INSTALACION.md](docs/INSTALACION.md).
+
+Para una guía detallada de instalación en Windows 10/11, consultá [docs/INSTALACION.md](docs/INSTALACION.md).
 
 ---
 

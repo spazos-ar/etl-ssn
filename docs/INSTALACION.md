@@ -39,6 +39,34 @@ pip --version
 
 ## Instalación del Proyecto
 
+### 🚀 Instalación Rápida (Recomendada)
+
+**¿Acabás de clonar el repositorio? Seguí estos 3 pasos:**
+
+1. **Clona el repositorio** (si no lo hiciste):
+```powershell
+# Crear carpeta y navegar
+New-Item -ItemType Directory -Force -Path "$HOME\source\repos"
+cd $HOME\source\repos
+
+# Clonar proyecto
+git clone https://github.com/spazos-ar/etl-ssn.git
+cd etl-ssn
+```
+
+2. **Ejecuta la configuración automática**:
+```powershell
+python setup.py
+```
+
+3. **¡Listo! Ya podés usar el sistema** 🎉
+
+El script automático se encarga de todo: crear el entorno virtual, instalar dependencias, configurar SSL, validar credenciales, y preparar el sistema.
+
+---
+
+### 📋 Instalación Manual Detallada (Solo si necesitás más control)
+
 ### 1. Clonar el Repositorio
 
 1. Abre PowerShell o CMD (ventana de comando)
@@ -80,20 +108,37 @@ python -m venv .venv
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-### 3. Configuración Automática (Recomendado)
+### 3. Configuración Automática ⭐ (RECOMENDADO)
 
-La forma más sencilla de completar la instalación es usar el script de configuración automática:
+**Esta es la forma más rápida y sencilla de completar la instalación:**
 
 ```powershell
 # Con el entorno virtual activado, ejecutar:
 python setup.py
 ```
 
-Este script realizará automáticamente:
-- Instalación de dependencias
-- Configuración del certificado SSL
-- Verificación de la conexión
-- Validación de la configuración
+🎉 **¡Eso es todo!** El script `setup.py` realizará automáticamente:
+- ✅ Instalación de todas las dependencias (incluyendo python-dotenv)
+- ✅ Configuración del certificado SSL
+- ✅ Solicitud y validación de tus credenciales del SSN
+- ✅ Creación del archivo `.env` con tu configuración  
+- ✅ Verificación de la conexión con el sistema SSN
+- ✅ Activación automática del entorno virtual
+
+### Comandos disponibles después de `setup.py`:
+
+Una vez completada la configuración automática, tenés estos comandos listos para usar:
+
+```powershell
+# Activar entorno virtual (si no está activado)
+.\.venv\Scripts\Activate
+
+# Procesar datos semanales
+.\ProcesarSem.bat query 2025-15
+
+# Procesar datos mensuales  
+.\ProcesarMes.bat upload
+```
 
 ### 4. Instalación Manual (Alternativa)
 
