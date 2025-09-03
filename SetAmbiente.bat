@@ -1,16 +1,21 @@
 @echo off
-REM Script para cambiar el ambiente de configuración SSN
-REM Uso: SetAmbiente.bat prod   o   SetAmbiente.bat test
+echo.
+echo ================================================
+echo   CONFIGURADOR DE AMBIENTE SSN - ETL System
+echo ================================================
 
-if "%~1"=="" (
+if "%1"=="" (
+    echo Error: Debe especificar el ambiente
+    echo.
     echo Uso: SetAmbiente.bat [prod^|test]
+    echo.
     exit /b 1
 )
 
-REM Activar entorno virtual si existe
-if exist ".venv\Scripts\activate" call .venv\Scripts\activate
+echo Configurando ambiente: %1
+echo.
 
 python upload\set_env.py %1
-if %ERRORLEVEL% neq 0 exit /b %ERRORLEVEL%
 
-echo Ambiente actualizado a %1
+echo.
+echo ================================================

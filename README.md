@@ -41,12 +41,41 @@ Después de ejecutar `python setup.py`, tenés estos comandos disponibles:
 # Activar entorno virtual (si no está activado)
 .\.venv\Scripts\Activate
 
+# Cambiar ambiente de trabajo
+.\SetAmbiente.bat prod    # Para ambiente de producción
+.\SetAmbiente.bat test    # Para ambiente de pruebas
+
 # Procesar datos semanales
 .\ProcesarSem.bat query 2025-15
 
 # Procesar datos mensuales  
 .\ProcesarMes.bat upload
 ```
+
+### 🌐 Sistema Multi-Ambiente:
+
+El sistema soporta dos ambientes con configuración SSL inteligente:
+- **Producción** (`prod`): https://ri.ssn.gob.ar/api - SSL verificado, certificados completos
+- **Pruebas** (`test`): https://testri.ssn.gob.ar/api - SSL sin verificación para evitar problemas del servidor
+
+```powershell
+# Cambiar a ambiente de pruebas (SSL deshabilitado, timeout: 15s)
+.\SetAmbiente.bat test
+
+# Cambiar a ambiente de producción (SSL habilitado, timeout: 30s)
+.\SetAmbiente.bat prod
+
+# Verificar conexión del ambiente actual
+python upload\ssn-mensual.py --test
+```
+
+El cambio de ambiente configura automáticamente:
+✅ URL del servidor apropiada  
+✅ Certificados específicos por ambiente  
+✅ Configuración SSL optimizada  
+✅ Timeouts diferenciados por servidor  
+
+**Nota**: Por defecto se configura el ambiente de **producción**. Para más información consulte [docs/MULTI-AMBIENTE.md](docs/MULTI-AMBIENTE.md).
 
 ### Instalación manual (solo si setup.py falla):
 
@@ -206,6 +235,32 @@ Podés usar el script batch para automatizar el flujo completo. Opciones:
 - `extract/`: Scripts y configuraciones de extracción
 - `upload/`: Scripts y configuraciones de carga
 - `docs/`: Documentación técnica y ejemplos
+
+---
+
+# 🔧 Troubleshooting
+
+## Problemas Comunes
+
+**Error de variables de entorno:**
+```
+❌ Error: La variable de entorno SSN_COMPANY no está definida
+```
+**Solución**: Ejecutar `python setup.py` para recrear el archivo `.env`
+
+**Error de certificado en PROD:**
+```
+Error crítico en la configuración SSL: certificate verify failed
+```
+**Solución**: Regenerar certificados ejecutando `python upload/get_cert.py`
+
+**Timeout en TEST:**
+```
+Error de autenticación: The handshake operation timed out  
+```
+**Solución**: Normal para servidor TEST. El sistema maneja estos casos automáticamente.
+
+**Para más información**: Consultar [docs/MULTI-AMBIENTE.md](docs/MULTI-AMBIENTE.md) y [docs/INSTALACION.md](docs/INSTALACION.md)
 
 ---
 

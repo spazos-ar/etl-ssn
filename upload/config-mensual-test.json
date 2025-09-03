@@ -1,15 +1,15 @@
 {
     "retries": 1,
     "debug": false,
-    "environment": "prod",
-    "baseUrl": "https://ri.ssn.gob.ar/api",
+    "environment": "test",
+    "baseUrl": "https://testri.ssn.gob.ar/api",
     "endpoints": {
         "authenticate": "/login",
         "entregaMensual": "/inv/entregaMensual",
         "confirmarEntregaMensual": "/inv/confirmarEntregaMensual"
     },
     "ssl": {
-        "verify": true,
+        "verify": false,
         "cafile": "certs/ssn_cert_20250903.pem"
     }
 }

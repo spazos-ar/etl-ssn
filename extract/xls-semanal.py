@@ -50,6 +50,7 @@ import argparse
 import sys
 import platform
 from datetime import datetime
+from dotenv import load_dotenv
 
 # Configurar la codificación para sistemas Windows
 if platform.system() == "Windows":
@@ -88,6 +89,9 @@ def get_config_path():
     return config_path, args.xls_path
 
 def load_config():
+    # Cargar variables de entorno desde .env
+    load_dotenv()
+    
     config_path, xls_path = get_config_path()
     with open(config_path, 'r') as f:
         config = json.load(f)

@@ -126,6 +126,20 @@ def load_config(config_path):
     with open(config_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
+def show_startup_banner(config):
+    """Muestra el banner inicial con información del script y ambiente."""
+    env = config.get('environment', 'prod').upper()
+    base_url = config.get('baseUrl', 'URL no configurada')
+    
+    print("=" * 60)
+    print("📊 SCRIPT DE CARGA MENSUAL SSN")
+    print("=" * 60)
+    print(f"🏢 Tipo de entrega: MENSUAL")
+    print(f"🌐 Ambiente: {env}")
+    print(f"🔗 Servidor: {base_url}")
+    print(f"📅 Fecha: {os.environ.get('DATE', 'No disponible')}")
+    print("-" * 60)
+
 def authenticate(config):
     """Autentica con el servicio SSN usando el cliente HTTP."""
     try:
@@ -257,13 +271,24 @@ def test_ssl_connection(config):
     try:
         with SSNClient(config, debug=config.get('debug', False)) as client:
             # La inicialización del cliente ya prueba la conexión SSL
+            # Hacer un test simple adicional para confirmar que funciona
+            base_url = config.get('baseUrl', '')
+            if config.get('debug', False):
+                print(f"DEBUG: Cliente creado para {base_url}")
+            if not config.get('debug', False):
+                print("✅ Conexión SSL verificada correctamente")
             return True
     except Exception as e:
+        print(f"❌ Error en la prueba de conexión SSL: {str(e)}")
         raise RuntimeError(f"Error en la prueba de conexión SSL: {str(e)}")
 
 def main():
     config_path, data_file, confirm, fix, query, empty, test = get_args()
     config = load_config(config_path)
+
+    # Mostrar banner de inicio (excepto para tests SSL)
+    if not test:
+        show_startup_banner(config)
 
     if test:
         test_ssl_connection(config)

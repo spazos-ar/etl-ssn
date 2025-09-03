@@ -161,6 +161,20 @@ def load_config(config_path):
     
     return config
 
+def show_startup_banner(config):
+    """Muestra el banner inicial con información del script y ambiente."""
+    env = config.get('environment', 'prod').upper()
+    base_url = config.get('baseUrl', 'URL no configurada')
+    
+    print("=" * 60)
+    print("📈 SCRIPT DE CARGA SEMANAL SSN")
+    print("=" * 60)
+    print(f"🏢 Tipo de entrega: SEMANAL")
+    print(f"🌐 Ambiente: {env}")
+    print(f"🔗 Servidor: {base_url}")
+    print(f"📅 Fecha: {os.environ.get('DATE', 'No disponible')}")
+    print("-" * 60)
+
 def setup_logging(debug_mode):
     """Configura el sistema de logging.
     
@@ -404,13 +418,14 @@ def main():
         # Configurar logging
         setup_logging(config.get('debug', False))
         
+        # Mostrar banner de inicio (excepto para tests SSL)
+        if not test:
+            show_startup_banner(config)
+        
         # Verificar si se solicitó una prueba de conexión SSL
         if test:
             test_ssl_connection(config)
             return
-        
-        # Configurar logging
-        setup_logging(config.get('debug', False))
         
         # Obtener el código de compañía desde las variables de entorno
         company = os.getenv('SSN_COMPANY')

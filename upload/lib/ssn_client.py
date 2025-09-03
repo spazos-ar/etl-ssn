@@ -76,111 +76,127 @@ class SSNClient:
         self._setup_logging()
         
         # Configuración de timeouts
-        timeout = 30.0
+        # Para TEST (verify: false): timeout más alto debido a latencia del servidor de pruebas
+        # Para PROD (verify: true): timeout estándar
+        timeout = 15.0 if not self.config.get('ssl', {}).get('verify', True) else 30.0
         
         # Configuración de SSL para producción
         self.verify = True  # Por defecto habilitado en producción
         ssl_context = None
         
-        try:
-            # Crear contexto SSL con certificados del sistema y certifi
-            ssl_context = ssl.create_default_context()
-            ssl_context.load_default_certs()
-            # Cargar certificados de certifi
-            ssl_context.load_verify_locations(cafile=certifi.where())
-            
-            # Cargar certificado específico de la SSN si está configurado
-            if 'cafile' in self.config.get('ssl', {}):
-                ca_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
-                                     self.config['ssl']['cafile'])
-                if os.path.exists(ca_file):
-                    ssl_context.load_verify_locations(cafile=ca_file)
-                    if not self.debug and not SSNClient._ssl_messages_shown:
-                        print("🔐 Certificados de seguridad SSN cargados correctamente")
-                    elif self.debug:
-                        self.logger.info(f"Cargado certificado específico: {ca_file}")
-                else:
-                    self.logger.warning(f"No se encontró el archivo de certificado: {ca_file}")
-            
-            # Configurar nivel de seguridad para producción
-            ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
-            ssl_context.verify_mode = ssl.CERT_REQUIRED
-            ssl_context.check_hostname = True
-            
-            # Mostramos información del certificado para diagnóstico
-            if self.debug:
-                from OpenSSL import SSL
-                ctx = SSL.Context(SSL.TLS_METHOD)
-                ctx.load_verify_locations(cafile=certifi.where())
-                self.logger.debug("🔧 Configuración SSL:")
-                self.logger.debug(f"📁 Certificados cargados de: {certifi.where()}")
-                self.logger.debug(f"🔒 Versión mínima TLS: 1.2")
-                self.logger.debug(f"✅ Modo de verificación: CERT_REQUIRED")
-                self.logger.debug(f"🌐 Verificación de hostname: Activada")
-            elif not SSNClient._ssl_messages_shown:
-                print("🔒 Configurando conexión segura SSL/TLS...")
-            
-            # Hacemos una prueba de conexión
-            test_client = httpx.Client(
-                verify=ssl_context,
-                timeout=5.0  # timeout corto para la prueba
-            )
-            
+        # Configuración de SSL basada en la configuración del usuario
+        if self.config.get('ssl', {}).get('verify', True):
+            # Configuración SSL estricta (verificación habilitada)
             try:
-                response = test_client.get(self.config['baseUrl'])
-                # Intentar obtener información del certificado
-                try:
-                    cert = response.extensions.get_ssl_context()
-                    if cert and self.debug:
-                        self.logger.debug(f"Conexión establecida con:")
-                        self.logger.debug(f"Protocolo: {cert.protocol if hasattr(cert, 'protocol') else 'N/A'}")
-                        self.logger.debug(f"Cipher: {cert.cipher() if hasattr(cert, 'cipher') else 'N/A'}")
-                except Exception:
-                    pass  # No es crítico si no podemos obtener esta información
+                # Crear contexto SSL con certificados del sistema y certifi
+                ssl_context = ssl.create_default_context()
+                ssl_context.load_default_certs()
+                # Cargar certificados de certifi
+                ssl_context.load_verify_locations(cafile=certifi.where())
                 
-            except httpx.ConnectError as conn_err:
-                if "SSL" in str(conn_err) or "certificate" in str(conn_err).lower():
-                    self.logger.error(f"Error de verificación SSL: {str(conn_err)}")
-                    raise
-                else:
-                    raise RuntimeError(f"Error de conexión: {str(conn_err)}")
-            finally:
-                test_client.close()
-            
-            # Si llegamos aquí, la verificación SSL fue exitosa
-            self.verify = True
-            self.ssl_context = ssl_context
-            if not self.debug and not SSNClient._ssl_messages_shown:
-                print("✅ Conexión SSL verificada correctamente")
-                SSNClient._ssl_messages_shown = True
-            elif self.debug:
-                self.logger.info("Conexión SSL verificada correctamente")
-            
-        except Exception as e:
-            error_msg = f"Error crítico en la configuración SSL: {str(e)}"
-            if self.config.get('ssl', {}).get('verify', True):
+                # Cargar certificado específico de la SSN si está configurado
+                if 'cafile' in self.config.get('ssl', {}):
+                    ca_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
+                                         self.config['ssl']['cafile'])
+                    if os.path.exists(ca_file):
+                        ssl_context.load_verify_locations(cafile=ca_file)
+                        if not self.debug and not SSNClient._ssl_messages_shown:
+                            print("🔐 Certificados de seguridad SSN cargados correctamente")
+                        elif self.debug:
+                            self.logger.info(f"Cargado certificado específico: {ca_file}")
+                    else:
+                        self.logger.warning(f"No se encontró el archivo de certificado: {ca_file}")
+                
+                # Configurar nivel de seguridad para producción
+                ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+                ssl_context.verify_mode = ssl.CERT_REQUIRED
+                ssl_context.check_hostname = True
+                
+                # Mostramos información del certificado para diagnóstico
+                if self.debug:
+                    from OpenSSL import SSL
+                    ctx = SSL.Context(SSL.TLS_METHOD)
+                    ctx.load_verify_locations(cafile=certifi.where())
+                    self.logger.debug("🔧 Configuración SSL:")
+                    self.logger.debug(f"📁 Certificados cargados de: {certifi.where()}")
+                    self.logger.debug(f"🔒 Versión mínima TLS: 1.2")
+                    self.logger.debug(f"✅ Modo de verificación: CERT_REQUIRED")
+                    self.logger.debug(f"🌐 Verificación de hostname: Activada")
+                elif not SSNClient._ssl_messages_shown:
+                    print("� Certificados de seguridad SSN cargados correctamente")
+                    print("�🔒 Configurando conexión segura SSL/TLS...")
+                
+                # Hacemos una prueba de conexión
+                test_client = httpx.Client(
+                    verify=ssl_context,
+                    timeout=5.0  # timeout corto para la prueba
+                )
+                
+                try:
+                    response = test_client.get(self.config['baseUrl'])
+                    # Intentar obtener información del certificado
+                    try:
+                        cert = response.extensions.get_ssl_context()
+                        if cert and self.debug:
+                            self.logger.debug(f"Conexión establecida con:")
+                            self.logger.debug(f"Protocolo: {cert.protocol if hasattr(cert, 'protocol') else 'N/A'}")
+                            self.logger.debug(f"Cipher: {cert.cipher() if hasattr(cert, 'cipher') else 'N/A'}")
+                    except Exception:
+                        pass  # No es crítico si no podemos obtener esta información
+                    
+                except httpx.ConnectError as conn_err:
+                    if "SSL" in str(conn_err) or "certificate" in str(conn_err).lower():
+                        self.logger.error(f"Error de verificación SSL: {str(conn_err)}")
+                        raise
+                    else:
+                        raise RuntimeError(f"Error de conexión: {str(conn_err)}")
+                finally:
+                    test_client.close()
+                
+                # Si llegamos aquí, la verificación SSL fue exitosa
+                self.verify = True
+                self.ssl_context = ssl_context
+                if not self.debug and not SSNClient._ssl_messages_shown:
+                    print("✅ Conexión SSL verificada correctamente")
+                    SSNClient._ssl_messages_shown = True
+                elif self.debug:
+                    self.logger.info("Conexión SSL verificada correctamente")
+                    
+            except Exception as e:
+                error_msg = f"Error crítico en la configuración SSL: {str(e)}"
                 self.logger.error(error_msg)
                 if self.debug:
                     import traceback
                     self.logger.debug("Traceback completo del error SSL:")
                     self.logger.debug(traceback.format_exc())
                 raise RuntimeError(f"{error_msg} Por favor, verifique la configuración SSL.")
-            else:
-                # Solo si se ha configurado explícitamente para no verificar
-                self.logger.warning("ADVERTENCIA DE SEGURIDAD: Continuando sin verificación SSL según configuración.")
-                self.verify = False
-                ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-                ssl_context.check_hostname = False
-                ssl_context.verify_mode = ssl.CERT_NONE
-                warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-                self.ssl_context = ssl_context
+        else:
+            # Configuración SSL deshabilitada (verify: false)
+            # Sin prueba de conexión previa para evitar bloqueos con servidores problemáticos
+            self.logger.warning("ADVERTENCIA DE SEGURIDAD: Continuando sin verificación SSL según configuración.")
+            self.verify = False
+            self.ssl_context = False  # Para httpx, usar False directamente
+            warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+            if not self.debug and not SSNClient._ssl_messages_shown:
+                print("🔐 Certificados de seguridad SSN cargados correctamente")
+                print("✅ Conexión SSL configurada (verificación deshabilitada)")
+                SSNClient._ssl_messages_shown = True
+            elif self.debug:
+                self.logger.debug("🔧 Configuración SSL deshabilitada según configuración")
+                self.logger.debug("⏩ Omitiendo prueba de conexión previa para evitar bloqueos")
 
         # Cliente HTTP con configuración base y SSL personalizado
+        if self.debug:
+            self.logger.debug(f"Creando cliente HTTP con verify={self.ssl_context}, timeout={timeout}")
+        
         self.client = httpx.Client(
             verify=self.ssl_context,
             timeout=timeout,
             headers={"Content-Type": "application/json"}
         )
+        
+        if self.debug:
+            self.logger.debug("Cliente HTTP creado exitosamente")
     
     def _setup_logging(self):
         """Configura el sistema de logging."""

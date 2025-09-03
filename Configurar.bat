@@ -1,18 +1,39 @@
 @echo off
 REM Script para configurar el proyecto ETL SSN y activar el entorno virtual
-REM Uso: ConfigurarProyecto.bat
+REM Uso: Configurar.bat
+
+echo.
+echo ================================================
+echo   CONFIGURACION INICIAL - ETL SSN System
+echo ================================================
+echo.
 
 python setup.py
 if %ERRORLEVEL% neq 0 (
-    echo Error en la configuración. Revisá los mensajes anteriores.
+    echo.
+    echo Error en la configuracion. Revise los mensajes anteriores.
     exit /b %ERRORLEVEL%
 )
 
-REM Activar entorno virtual
-REM Para activar el entorno virtual, ejecutá manualmente en la terminal:
-echo Configuración completada!
-echo Para activar el entorno virtual, ejecutá:
-echo .........................................
-echo .      .venv\Scripts\activate           .
-echo .........................................
-echo Activá el entorno virtual antes de ejecutar los comandos del sistema ETL SSN.
+echo.
+echo ================================================
+echo   CONFIGURACION COMPLETADA EXITOSAMENTE
+echo ================================================
+echo.
+echo Proximos pasos:
+echo.
+echo 1. Activar entorno virtual:
+echo    .venv\Scripts\activate
+echo.
+echo 2. Configurar ambiente de trabajo:
+echo    SetAmbiente.bat prod   (para produccion)
+echo    SetAmbiente.bat test   (para pruebas)
+echo.
+echo 3. Procesar datos:
+echo    ProcesarMes.bat        (datos mensuales)
+echo    ProcesarSem.bat        (datos semanales)
+echo.
+echo NOTA: Por defecto se configura el ambiente de PRODUCCION
+echo      Use SetAmbiente.bat para cambiar entre ambientes
+echo.
+echo ================================================

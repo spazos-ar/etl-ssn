@@ -56,68 +56,214 @@ def install_requirements():
                          encoding='utf-8', errors='replace')
 
 def setup_ssl_cert():
-    """Configura el certificado SSL."""
+    """Configura los certificados SSL para ambos ambientes."""
     python_path = get_python_path()
     
     # Crear directorio de certificados si no existe
     cert_dir = Path('upload/certs')
     cert_dir.mkdir(parents=True, exist_ok=True)
     
+    certificates = {}
+    
     try:
-        # Ejecutar script para obtener el certificado
-        subprocess.check_call([python_path, 'upload/get_cert.py'], 
+        print("🔒 Obteniendo certificados SSL...")
+        
+        # Obtener certificado de producción (siempre requerido)
+        print("🏭 Obteniendo certificado de PRODUCCIÓN...")
+        subprocess.check_call([python_path, 'upload/get_cert.py', '--env', 'prod'], 
                              encoding='utf-8', errors='replace')
         
-        # Mover el certificado a la carpeta correcta
-        cert_files = list(Path('.').glob('ssn_cert_*.pem'))
-        if cert_files:
-            latest_cert = max(cert_files, key=lambda x: x.stat().st_mtime)
-            dest_path = cert_dir / latest_cert.name
+        # Buscar certificado de prod obtenido
+        prod_cert_files = [f for f in Path('.').glob('ssn_cert_*.pem') if 'test' not in f.name]
+        if prod_cert_files:
+            prod_cert_file = prod_cert_files[0]
+            dest_path = cert_dir / prod_cert_file.name
             
-            # Si el archivo ya existe, lo eliminamos primero
             if dest_path.exists():
                 dest_path.unlink()
             
-            latest_cert.rename(dest_path)
-            print(f"📁 Certificado guardado en: {dest_path}")
+            prod_cert_file.rename(dest_path)
+            certificates['prod'] = prod_cert_file.name
+            print(f"✅ Certificado PROD guardado en: {dest_path}")
+        
+        # Intentar obtener certificado de test (opcional)
+        print("🧪 Intentando obtener certificado de TEST...")
+        try:
+            result = subprocess.run([python_path, 'upload/get_cert.py', '--env', 'test'], 
+                                   capture_output=True, text=True, encoding='utf-8', errors='replace')
             
-            # Actualizar la configuración
-            update_config(latest_cert.name)
+            if result.returncode == 0:
+                # Buscar certificado de test obtenido
+                test_cert_files = [f for f in Path('.').glob('ssn_cert_*test*.pem')]
+                if test_cert_files:
+                    test_cert_file = test_cert_files[0]
+                    dest_path = cert_dir / test_cert_file.name
+                    
+                    if dest_path.exists():
+                        dest_path.unlink()
+                    
+                    test_cert_file.rename(dest_path)
+                    certificates['test'] = test_cert_file.name
+                    print(f"✅ Certificado TEST guardado en: {dest_path}")
+                else:
+                    print("⚠️  Certificado de TEST no encontrado después de la descarga")
+            else:
+                print("⚠️  No se pudo obtener certificado de TEST (servidor inactivo)")
+                
+        except Exception as e:
+            print(f"⚠️  Error obteniendo certificado de TEST: {e}")
+        
+        # Actualizar configuraciones
+        if certificates:
+            update_config_multi_env(certificates)
             print("⚙️  Configuración actualizada correctamente")
         else:
-            print("❌ No se pudo obtener el certificado automáticamente.")
-            print("📝 Por favor, siga las instrucciones en docs/INSTALACION.md para la configuración manual.")
+            print("❌ No se pudo obtener ningún certificado.")
+            raise RuntimeError("No se pudo obtener el certificado de producción")
+            
     except Exception as e:
         print(f"❌ Error al configurar el certificado: {e}")
         print("📝 Por favor, siga las instrucciones en docs/INSTALACION.md para la configuración manual.")
 
 def update_config(cert_filename):
     """Actualiza los archivos de configuración con el nuevo certificado."""
-    config_files = ['upload/config-mensual.json', 'upload/config-semanal.json']
+    # Archivos de configuración a actualizar (todos los ambientes)
+    config_files = [
+        'upload/config-mensual.json', 
+        'upload/config-semanal.json',
+        'upload/config-mensual-prod.json',
+        'upload/config-semanal-prod.json',
+        'upload/config-mensual-test.json',
+        'upload/config-semanal-test.json'
+    ]
+    
+    print("🔧 Actualizando configuraciones de certificados...")
+    
+    # Determinar qué certificado usar para cada ambiente
+    cert_mappings = {
+        'upload/config-mensual.json': f'certs/{cert_filename}',
+        'upload/config-semanal.json': f'certs/{cert_filename}',
+        'upload/config-mensual-prod.json': f'certs/{cert_filename}',
+        'upload/config-semanal-prod.json': f'certs/{cert_filename}',
+        'upload/config-mensual-test.json': f'certs/ssn_cert_test_20250903.pem',
+        'upload/config-semanal-test.json': f'certs/ssn_cert_test_20250903.pem'
+    }
     
     for config_file in config_files:
         if os.path.exists(config_file):
-            with open(config_file, 'r', encoding='utf-8') as f:
-                content = f.read()
+            try:
+                import json
+                
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                
+                # Actualizar el certificado
+                cert_path = cert_mappings.get(config_file, f'certs/{cert_filename}')
+                
+                if 'ssl' not in config_data:
+                    config_data['ssl'] = {}
+                
+                config_data['ssl']['verify'] = True
+                config_data['ssl']['cafile'] = cert_path
+                
+                # Escribir la configuración actualizada
+                with open(config_file, 'w', encoding='utf-8') as f:
+                    json.dump(config_data, f, indent=4, ensure_ascii=False)
+                
+                print(f"✅ Configuración actualizada: {config_file}")
             
-            if '"cafile":' not in content:
-                # Si no existe la configuración SSL, la agregamos
-                content = content.replace(
-                    '"verify": true\n    }',
-                    f'"verify": true,\n        "cafile": "certs/{cert_filename}"\n    }}'
-                )
-            else:
-                # Si existe, actualizamos el nombre del archivo
-                import re
-                content = re.sub(
-                    r'"cafile":\s*"[^"]*"',
-                    f'"cafile": "certs/{cert_filename}"',
-                    content
-                )
+            except Exception as e:
+                print(f"⚠️  Error al actualizar {config_file}: {e}")
+        else:
+            print(f"⚠️  Archivo no encontrado: {config_file}")
+    
+    print("📋 Nota: Para el ambiente de test, asegúrese de obtener el certificado correcto")
+
+def update_config_multi_env(certificates):
+    """Actualiza todos los archivos de configuración con los certificados correctos por ambiente."""
+    # Archivos de configuración a actualizar (todos los ambientes)
+    config_files = [
+        'upload/config-mensual.json', 
+        'upload/config-semanal.json',
+        'upload/config-mensual-prod.json',
+        'upload/config-semanal-prod.json',
+        'upload/config-mensual-test.json',
+        'upload/config-semanal-test.json'
+    ]
+    
+    print("🔧 Actualizando configuraciones de certificados para todos los ambientes...")
+    
+    # Determinar qué certificado usar para cada ambiente
+    prod_cert = certificates.get('prod', 'ssn_cert_20250903.pem')
+    test_cert = certificates.get('test')
+    
+    # Si no hay certificado de test, usar el de prod pero sin verificación SSL
+    if not test_cert:
+        print("⚠️  No se obtuvo certificado de TEST, configurando con verificación SSL deshabilitada")
+        test_cert = prod_cert
+        test_ssl_verify = False
+    else:
+        test_ssl_verify = True
+    
+    cert_mappings = {
+        'upload/config-mensual.json': (f'certs/{prod_cert}', True),
+        'upload/config-semanal.json': (f'certs/{prod_cert}', True),
+        'upload/config-mensual-prod.json': (f'certs/{prod_cert}', True),
+        'upload/config-semanal-prod.json': (f'certs/{prod_cert}', True),
+        'upload/config-mensual-test.json': (f'certs/{test_cert}', test_ssl_verify),
+        'upload/config-semanal-test.json': (f'certs/{test_cert}', test_ssl_verify)
+    }
+    
+    for config_file in config_files:
+        if os.path.exists(config_file):
+            try:
+                import json
+                
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                
+                # Actualizar el certificado y verificación SSL
+                cert_path, ssl_verify = cert_mappings.get(config_file, (f'certs/{prod_cert}', True))
+                
+                if 'ssl' not in config_data:
+                    config_data['ssl'] = {}
+                
+                config_data['ssl']['verify'] = ssl_verify
+                config_data['ssl']['cafile'] = cert_path
+                
+                # Escribir la configuración actualizada
+                with open(config_file, 'w', encoding='utf-8') as f:
+                    json.dump(config_data, f, indent=4, ensure_ascii=False)
+                
+                verify_status = "✅" if ssl_verify else "⚠️"
+                print(f"{verify_status} Configuración actualizada: {config_file}")
             
-            with open(config_file, 'w', encoding='utf-8') as f:
-                f.write(content)
-            print(f"Configuración actualizada: {config_file}")
+            except Exception as e:
+                print(f"❌ Error al actualizar {config_file}: {e}")
+        else:
+            print(f"⚠️  Archivo no encontrado: {config_file}")
+    
+    # Resumen de configuración de ambientes
+    print("\n📋 Resumen de configuración de ambientes:")
+    
+    # Ambiente PROD
+    if certificates.get('prod'):
+        print(f"   🏭 PROD: ✅ FUNCIONAL")
+        print(f"      └── Certificado: {certificates['prod']}")
+        print(f"      └── Verificación SSL: Habilitada")
+    else:
+        print(f"   🏭 PROD: ❌ ERROR - No se obtuvo certificado")
+    
+    # Ambiente TEST  
+    if certificates.get('test'):
+        print(f"   🧪 TEST: ✅ FUNCIONAL")
+        print(f"      └── Certificado: {certificates['test']}")
+        print(f"      └── Verificación SSL: Habilitada")
+    else:
+        print(f"   🧪 TEST: ⚠️  FUNCIONAL (Sin verificación SSL)")
+        print(f"      └── Certificado: {prod_cert} (usando certificado de PROD)")
+        print(f"      └── Verificación SSL: Deshabilitada")
+        print(f"      └── Nota: Para habilitar SSL en TEST, obtenga el certificado real")
 
 def get_masked_input(prompt):
     """Lee la entrada del usuario mostrando asteriscos. Compatible con Windows y Linux."""
@@ -383,13 +529,32 @@ Este asistente lo guiará en la configuración inicial del sistema:
             print("  2️⃣ python extract\\xls-semanal.py   : Procesa datos semanales") 
             print("  3️⃣ python upload\\ssn-mensual.py    : Sube datos mensuales a SSN")
             print("  4️⃣ python upload\\ssn-semanal.py    : Sube datos semanales a SSN")
+            print("\n🌐 Configuración de Ambientes:")
+            print("  🏭 SetAmbiente.bat prod : Cambia a ambiente de producción")
+            print("  🧪 SetAmbiente.bat test : Cambia a ambiente de pruebas")
+            print("  ℹ️  Por defecto se configura el ambiente de PRODUCCIÓN")
+            print("\n💡 Nota importante sobre certificados:")
+            print("  🔒 El certificado obtenido es válido para el ambiente de PRODUCCIÓN")
+            print("  🧪 Para usar el ambiente de TEST, deberá obtener el certificado correspondiente")
+            print("      y reemplazar el archivo: upload/certs/ssn_cert_test_20250903.pem")
             print("\n🔧 Para usar Python con las dependencias instaladas, use:")
             print("  1. Para cambiar política de PowerShell (recomendado):")
             print("     🏃▶️ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser")
             print("     🏃▶️ Luego: .\\.venv\\Scripts\\Activate")
             print("  2. O ejecute directamente con Python del entorno virtual:")
             print("     🏃▶️ .\\.venv\\Scripts\\python.exe <script>")
-            print("\nPara más información, consulte docs/INSTALACION.md\n\r")
+            
+            # Asegurar que quede configurado en ambiente de producción
+            print("\n🎯 Configurando ambiente por defecto (PRODUCCIÓN)...")
+            try:
+                subprocess.check_call([get_python_path(), 'upload/set_env.py', 'prod'], 
+                                     encoding='utf-8', errors='replace')
+                print("✅ Ambiente configurado correctamente en PRODUCCIÓN")
+            except Exception as e:
+                print(f"⚠️  Advertencia: No se pudo configurar el ambiente automáticamente: {e}")
+                print("💡 Ejecute manualmente: SetAmbiente.bat prod")
+            
+            print("\nPara más información, consulte docs/INSTALACION.md y docs/MULTI-AMBIENTE.md\n\r")
         else:
             print("\n❌ La configuración no pudo ser verificada completamente")
             print("⚠️ Por favor, revise los errores anteriores")
