@@ -75,6 +75,26 @@ from pathlib import Path
 import re
 from lib.ssn_client import SSNClient  # TODO: Actualizar a ssn-client en v2.0
 
+def show_error_message(error_message):
+    """Muestra un mensaje de error destacado y bien formateado."""
+    print("\n" + "="*80)
+    print("|| ERROR:")
+    print("||")
+    # Dividir el mensaje en líneas para ajustar al ancho
+    for line in error_message.split('\n'):
+        if line.strip():
+            # Dividir líneas muy largas
+            while len(line) > 74:  # 80 - 4 (para "|| ") - 2 (margen)
+                print(f"|| {line[:74]}")
+                line = line[74:]
+            if line:
+                print(f"|| {line}")
+        else:
+            print("||")
+    print("||")
+    print("="*80)
+    print()  # Línea adicional después del cuadro de error
+
 env_path = Path(__file__).resolve().parents[1] / '.env'
 load_dotenv(dotenv_path=env_path)
 
@@ -184,8 +204,7 @@ def enviar_entrega(token, data, config):
             client.post("entregaMensual", data)
             print("✅ Entrega mensual enviada correctamente")
     except Exception as e:
-        print(f"\n❌ Error al enviar entrega mensual: {str(e)}")
-        sys.exit(1)
+        raise RuntimeError(f"Error al enviar entrega mensual: {str(e)}")
 
 def confirmar_entrega(token, company, cronograma, config):
     try:
@@ -319,14 +338,14 @@ if __name__ == "__main__":
     try:
         main()
     except ValueError as e:
-        print(f"\nError: {e}")
+        show_error_message(f"Error de validación: {str(e)}")
         sys.exit(1)
     except FileNotFoundError as e:
-        print(f"\nError: {e}")
+        show_error_message(f"Archivo no encontrado: {str(e)}")
         sys.exit(1)
     except RuntimeError as e:
-        print(f"\nError: {e}")
+        show_error_message(str(e))
         sys.exit(1)
     except Exception as e:
-        print(f"\nError inesperado: {e}")
+        show_error_message(f"Error inesperado: {str(e)}")
         sys.exit(1)

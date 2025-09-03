@@ -51,6 +51,26 @@ import shutil
 import platform
 from dotenv import load_dotenv
 
+def show_error_message(error_message):
+    """Muestra un mensaje de error destacado y bien formateado."""
+    print("\n" + "="*80)
+    print("|| ERROR:")
+    print("||")
+    # Dividir el mensaje en líneas para ajustar al ancho
+    for line in error_message.split('\n'):
+        if line.strip():
+            # Dividir líneas muy largas
+            while len(line) > 74:  # 80 - 4 (para "|| ") - 2 (margen)
+                print(f"|| {line[:74]}")
+                line = line[74:]
+            if line:
+                print(f"|| {line}")
+        else:
+            print("||")
+    print("||")
+    print("="*80)
+    print()  # Línea adicional después del cuadro de error
+
 # Configurar la codificación para sistemas Windows
 if platform.system() == "Windows":
     # Forzar UTF-8 para stdout y stderr
@@ -408,10 +428,18 @@ def test_ssl_connection(config):
     except Exception as e:
         raise RuntimeError(f"Error crítico en la configuración SSL: {str(e)} Por favor, verifique la configuración SSL.")
 
+def show_basic_banner():
+    """Muestra un banner básico sin configuración."""
+    print("=" * 60)
+    print("📈 SCRIPT DE CARGA SEMANAL SSN")
+    print("=" * 60)
+
 def main():
     """Función principal del script."""
     config = None  # Inicializar para evitar UnboundLocalError
+    
     try:
+        # Parseo inicial y configuración básica
         config_path, data_file, confirm_week, fix_week, query_week, empty_week, test = get_config_path()
         config = load_config(config_path)
         
@@ -494,12 +522,15 @@ def main():
                             raise
                         print(f"Intento {attempt} fallido: {str(e)}")
     
-    except ValueError as e:
-        print(f"Error: {str(e)}", file=sys.stderr)
+    except (FileNotFoundError, ValueError) as e:
+        # Errores de configuración temprana - mostrar banner básico si no se ha mostrado aún
+        if config is None:
+            show_basic_banner()
+        show_error_message(f"Error de configuración: {str(e)}")
         sys.exit(1)
     except RuntimeError as e:
         # Errores esperados del API o de validación
-        print(f"\nError: {str(e)}", file=sys.stderr)
+        show_error_message(str(e))
         sys.exit(1)
     except Exception as e:
         # Errores inesperados
@@ -507,7 +538,7 @@ def main():
             import traceback
             traceback.print_exc()
         else:
-            print(f"\nError inesperado: {str(e)}", file=sys.stderr)
+            show_error_message(f"Error inesperado: {str(e)}")
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -256,15 +256,33 @@ class SSNClient:
             data = response.json()
             
             if response.status_code != 200:
-                error_msg = (
-                    data.get("message") or
-                    data.get("detail") or
-                    data.get("errors") or
-                    response.text
-                )
-                if isinstance(error_msg, (list, dict)):
-                    error_msg = json.dumps(error_msg, indent=2, ensure_ascii=False)
-                raise RuntimeError(f"Error en {context}: {error_msg}")
+                # Construir mensaje de error más completo
+                error_parts = []
+                
+                # Agregar mensaje principal si existe
+                if data.get("message"):
+                    error_parts.append(data["message"])
+                
+                # Agregar errores específicos si existen
+                if data.get("errors"):
+                    if isinstance(data["errors"], list):
+                        for error in data["errors"]:
+                            error_parts.append(f"  • {error}")
+                    else:
+                        error_parts.append(f"  • {data['errors']}")
+                
+                # Si no hay mensaje estructurado, usar campos alternativos
+                if not error_parts:
+                    error_msg = (
+                        data.get("detail") or
+                        response.text
+                    )
+                    if isinstance(error_msg, (list, dict)):
+                        error_msg = json.dumps(error_msg, indent=2, ensure_ascii=False)
+                    error_parts.append(error_msg)
+                
+                full_error_msg = "\n".join(error_parts)
+                raise RuntimeError(f"Error en {context}: {full_error_msg}")
                 
             return data
             
