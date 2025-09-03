@@ -71,6 +71,16 @@ def show_error_message(error_message):
     print("="*80)
     print()  # Línea adicional después del cuadro de error
 
+def show_success_message(message="Operación completada exitosamente!"):
+    """Muestra un mensaje de éxito destacado y bien formateado."""
+    print("\n" + "="*80)
+    print("|| ✅ ÉXITO:")
+    print("||")
+    print(f"|| {message}")
+    print("||")
+    print("="*80)
+    print()  # Línea adicional después del cuadro de éxito
+
 # Configurar la codificación para sistemas Windows
 if platform.system() == "Windows":
     # Forzar UTF-8 para stdout y stderr
@@ -470,6 +480,7 @@ def main():
             for attempt in range(1, max_retries + 1):
                 try:
                     if query_semana(token, company, query_week, attempt, config.get('debug', False), config):
+                        show_success_message("Consulta de semana completada exitosamente!")
                         break
                 except RuntimeError as e:
                     if attempt == max_retries:
@@ -479,6 +490,7 @@ def main():
             for attempt in range(1, max_retries + 1):
                 try:
                     if fix_semana(token, company, fix_week, attempt, config.get('debug', False), config):
+                        show_success_message("Rectificativa de semana solicitada exitosamente!")
                         break
                 except RuntimeError as e:
                     if attempt == max_retries:
@@ -488,6 +500,7 @@ def main():
             for attempt in range(1, max_retries + 1):
                 try:
                     if send_empty_week(token, company, empty_week, attempt, config.get('debug', False), config):
+                        show_success_message("Semana vacía enviada exitosamente!")
                         break
                 except RuntimeError as e:
                     if attempt == max_retries:
@@ -502,6 +515,9 @@ def main():
                 try:
                     if enviar_entrega(token, company, data["OPERACIONES"], data["CRONOGRAMA"], 
                                     attempt, config.get('debug', False), config):
+                        # Solo mostrar mensaje si no hay confirmación pendiente
+                        if not confirm_week:
+                            show_success_message("Entrega semanal enviada exitosamente!")
                         break
                 except RuntimeError as e:
                     if attempt == max_retries:
@@ -516,6 +532,7 @@ def main():
                                           attempt, config.get('debug', False), config):
                             # Si la confirmación fue exitosa, mover el archivo
                             mover_archivo_procesado(data_file)
+                            show_success_message("Entrega semanal enviada y confirmada exitosamente!")
                             break
                     except RuntimeError as e:
                         if attempt == max_retries:

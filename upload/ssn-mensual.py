@@ -95,6 +95,16 @@ def show_error_message(error_message):
     print("="*80)
     print()  # Línea adicional después del cuadro de error
 
+def show_success_message(message="Operación completada exitosamente!"):
+    """Muestra un mensaje de éxito destacado y bien formateado."""
+    print("\n" + "="*80)
+    print("|| ✅ ÉXITO:")
+    print("||")
+    print(f"|| {message}")
+    print("||")
+    print("="*80)
+    print()  # Línea adicional después del cuadro de éxito
+
 env_path = Path(__file__).resolve().parents[1] / '.env'
 load_dotenv(dotenv_path=env_path)
 
@@ -318,10 +328,12 @@ def main():
 
     if query:
         query_mes(token, company, query, config)
+        show_success_message("Consulta mensual completada exitosamente!")
         return
 
     if fix:
         fix_mes(token, company, fix, config)
+        show_success_message("Rectificativa mensual solicitada exitosamente!")
         return
 
     if data_file:
@@ -333,6 +345,9 @@ def main():
         if confirm:
             confirmar_entrega(token, company, data['CRONOGRAMA'], config)
             mover_archivo_procesado(data_file)
+            show_success_message("Entrega mensual enviada y confirmada exitosamente!")
+        else:
+            show_success_message("Entrega mensual enviada exitosamente!")
 
 if __name__ == "__main__":
     try:
