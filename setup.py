@@ -60,8 +60,13 @@ def setup_ssl_cert():
     python_path = get_python_path()
     
     # Cargar configuración de certificados desde .env
-    from dotenv import load_dotenv
-    load_dotenv()
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        print("⚠️  Error: dotenv no está disponible. Verificando entorno virtual...")
+        # Re-ejecutar el script en el entorno virtual si no estamos ya ahí
+        raise RuntimeError("dotenv no disponible - necesita re-ejecución en venv")
     
     cert_dir_config = os.environ.get('SSL_CERT_DIR', 'upload/certs')
     cert_dir = Path(cert_dir_config)
@@ -72,8 +77,12 @@ def setup_ssl_cert():
     try:
         print("🔒 Obteniendo certificados SSL...")
         
-        # Intentar importar el gestor de certificados
-        from upload.lib.cert_utils import cert_manager
+        # Intentar importar el gestor de certificados - es opcional
+        try:
+            from upload.lib.cert_utils import cert_manager
+        except ImportError:
+            print("ℹ️  Módulo cert_utils no disponible, usando configuración básica")
+            cert_manager = None
         
         # Obtener certificado de producción (siempre requerido)
         print("🏭 Obteniendo certificado de PRODUCCIÓN...")
@@ -607,17 +616,39 @@ if __name__ == "__main__":
                        help='Indica que ya se está ejecutando desde el entorno virtual')
     args = parser.parse_args()
     
-    # Si no estamos usando el entorno virtual y existe, re-ejecutarnos con él
+    # Si no estamos usando el entorno virtual, hacer configuración inicial y luego re-ejecutar
     if not args.use_venv:
+        print("🔧 === Configuración inicial del proyecto ETL-SSN === 🔧")
+        print("🐍 Configurando entorno virtual...")
+        
+        # Paso 1: Crear entorno virtual
+        if create_venv():
+            print("✅ Entorno virtual creado correctamente")
+        else:
+            print("✅ Entorno virtual ya existe")
+        
+        # Paso 2: Instalar dependencias
+        print("📦 Instalando dependencias...")
+        try:
+            install_requirements()
+            print("✅ Dependencias instaladas correctamente")
+        except Exception as e:
+            print(f"❌ Error instalando dependencias: {e}")
+            sys.exit(1)
+        
+        # Re-ejecutar el script en el entorno virtual para la configuración completa
         venv_python = Path('.venv/Scripts/python.exe' if platform.system() == "Windows" else '.venv/bin/python')
         if venv_python.exists():
-            print("🔄 Re-ejecutando script con el entorno virtual...")
+            print("🔄 Re-ejecutando script con el entorno virtual para configuración completa...")
             try:
                 subprocess.check_call([str(venv_python), __file__, '--use-venv'])
+                print("✅ Configuración completada exitosamente")
             except subprocess.CalledProcessError as e:
-                print(f"⚠️  El script en el entorno virtual terminó con código: {e.returncode}")
-                if e.returncode != 0:
-                    sys.exit(e.returncode)
-            sys.exit(0)
-    
-    main()
+                print(f"❌ Error durante la configuración: {e}")
+                sys.exit(e.returncode)
+        else:
+            print("❌ Error: No se pudo encontrar el ejecutable de Python en el entorno virtual")
+            sys.exit(1)
+    else:
+        # Ejecutar configuración completa desde dentro del entorno virtual
+        main()
