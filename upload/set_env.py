@@ -76,11 +76,12 @@ def set_environment(env):
         available_certs = cert_manager.list_available_certs()
         if len(available_certs) > 1:
             print(f"📜 Certificados disponibles en {cert_manager.cert_dir}:")
-            for cert_file in available_certs:
-                cert_name = os.path.basename(cert_file)
+            for cert_info in available_certs:
+                cert_name = cert_info['filename']
                 is_current = cert_name in config['cert_path']
                 status = "🟢 ACTIVO" if is_current else "📄"
-                print(f"   {status} {cert_name}")
+                env_label = cert_info['environment'].upper()
+                print(f"   {status} {cert_name} ({env_label})")
     else:
         print("⚠️  No se pudo actualizar ningún archivo de configuración")
         sys.exit(1)
