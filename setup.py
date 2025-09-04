@@ -59,8 +59,12 @@ def setup_ssl_cert():
     """Configura los certificados SSL para ambos ambientes."""
     python_path = get_python_path()
     
-    # Crear directorio de certificados si no existe
-    cert_dir = Path('upload/certs')
+    # Cargar configuración de certificados desde .env
+    from dotenv import load_dotenv
+    load_dotenv()
+    
+    cert_dir_config = os.environ.get('SSL_CERT_DIR', 'upload/certs')
+    cert_dir = Path(cert_dir_config)
     cert_dir.mkdir(parents=True, exist_ok=True)
     
     certificates = {}
@@ -83,7 +87,8 @@ def setup_ssl_cert():
                 dest_path.unlink()
             
             prod_cert_file.rename(dest_path)
-            certificates['prod'] = prod_cert_file.name
+            # Guardar ruta relativa para uso en configuraciones
+            certificates['prod'] = str(cert_dir / prod_cert_file.name).replace('\\', '/')
             print(f"✅ Certificado PROD guardado en: {dest_path}")
         
         # Intentar obtener certificado de test (opcional)
@@ -103,7 +108,7 @@ def setup_ssl_cert():
                         dest_path.unlink()
                     
                     test_cert_file.rename(dest_path)
-                    certificates['test'] = test_cert_file.name
+                    certificates['test'] = str(cert_dir / test_cert_file.name).replace('\\', '/')
                     print(f"✅ Certificado TEST guardado en: {dest_path}")
                 else:
                     print("⚠️  Certificado de TEST no encontrado después de la descarga")
@@ -180,7 +185,9 @@ def update_config(cert_filename):
     print("📋 Nota: Para el ambiente de test, asegúrese de obtener el certificado correcto")
 
 def update_config_multi_env(certificates):
-    """Actualiza todos los archivos de configuración con los certificados correctos por ambiente."""
+    """Actualiza todos los archivos de configuración para todos los ambientes."""
+    from upload.lib.cert_utils import cert_manager
+    
     # Archivos de configuración a actualizar (todos los ambientes)
     config_files = [
         'upload/config-mensual.json', 
@@ -191,27 +198,28 @@ def update_config_multi_env(certificates):
         'upload/config-semanal-test.json'
     ]
     
-    print("🔧 Actualizando configuraciones de certificados para todos los ambientes...")
+    print("🔧 Actualizando configuraciones base para todos los ambientes...")
     
-    # Determinar qué certificado usar para cada ambiente
-    prod_cert = certificates.get('prod', 'ssn_cert_20250903.pem')
-    test_cert = certificates.get('test')
+    # Configuraciones base por ambiente (sin certificados)
+    env_configs = {
+        'prod': {
+            'url': 'https://ri.ssn.gob.ar/api',
+            'ssl_verify': True
+        },
+        'test': {
+            'url': 'https://testri.ssn.gob.ar/api',
+            'ssl_verify': False  # Sin verificación SSL para test
+        }
+    }
     
-    # Si no hay certificado de test, usar el de prod pero sin verificación SSL
-    if not test_cert:
-        print("⚠️  No se obtuvo certificado de TEST, configurando con verificación SSL deshabilitada")
-        test_cert = prod_cert
-        test_ssl_verify = False
-    else:
-        test_ssl_verify = True
-    
-    cert_mappings = {
-        'upload/config-mensual.json': (f'certs/{prod_cert}', True),
-        'upload/config-semanal.json': (f'certs/{prod_cert}', True),
-        'upload/config-mensual-prod.json': (f'certs/{prod_cert}', True),
-        'upload/config-semanal-prod.json': (f'certs/{prod_cert}', True),
-        'upload/config-mensual-test.json': (f'certs/{test_cert}', test_ssl_verify),
-        'upload/config-semanal-test.json': (f'certs/{test_cert}', test_ssl_verify)
+    # Mapeo de archivos a configuración
+    config_mappings = {
+        'upload/config-mensual.json': ('prod', env_configs['prod']),
+        'upload/config-semanal.json': ('prod', env_configs['prod']),
+        'upload/config-mensual-prod.json': ('prod', env_configs['prod']),
+        'upload/config-semanal-prod.json': ('prod', env_configs['prod']),
+        'upload/config-mensual-test.json': ('test', env_configs['test']),
+        'upload/config-semanal-test.json': ('test', env_configs['test'])
     }
     
     for config_file in config_files:
@@ -222,22 +230,26 @@ def update_config_multi_env(certificates):
                 with open(config_file, 'r', encoding='utf-8') as f:
                     config_data = json.load(f)
                 
-                # Actualizar el certificado y verificación SSL
-                cert_path, ssl_verify = cert_mappings.get(config_file, (f'certs/{prod_cert}', True))
+                # Obtener configuración para este archivo
+                env_name, env_config = config_mappings.get(config_file, ('prod', env_configs['prod']))
+                
+                # Actualizar configuración base (sin certificados)
+                config_data['environment'] = env_name
+                config_data['baseUrl'] = env_config['url']
                 
                 if 'ssl' not in config_data:
                     config_data['ssl'] = {}
                 
-                config_data['ssl']['verify'] = ssl_verify
-                config_data['ssl']['cafile'] = cert_path
+                config_data['ssl']['verify'] = env_config['ssl_verify']
+                # NO actualizamos cafile - se lee desde .env
                 
                 # Escribir la configuración actualizada
                 with open(config_file, 'w', encoding='utf-8') as f:
                     json.dump(config_data, f, indent=4, ensure_ascii=False)
                 
-                verify_status = "✅" if ssl_verify else "⚠️"
+                verify_status = "✅" if env_config['ssl_verify'] else "⚠️"
                 print(f"{verify_status} Configuración actualizada: {config_file}")
-            
+                
             except Exception as e:
                 print(f"❌ Error al actualizar {config_file}: {e}")
         else:
@@ -246,26 +258,22 @@ def update_config_multi_env(certificates):
     # Resumen de configuración de ambientes
     print("\n📋 Resumen de configuración de ambientes:")
     
-    # Ambiente PROD
-    if certificates.get('prod'):
-        print(f"   🏭 PROD: ✅ FUNCIONAL")
-        print(f"      └── Certificado: {certificates['prod']}")
-        print(f"      └── Verificación SSL: Habilitada")
-    else:
-        print(f"   🏭 PROD: ❌ ERROR - No se obtuvo certificado")
+    # Los certificados ahora se gestionan desde .env
+    cert_dir = os.environ.get('SSL_CERT_DIR', 'upload/certs')
     
-    # Ambiente TEST  
-    if certificates.get('test'):
-        print(f"   🧪 TEST: ✅ FUNCIONAL")
-        print(f"      └── Certificado: {certificates['test']}")
-        print(f"      └── Verificación SSL: Habilitada")
-    else:
-        print(f"   🧪 TEST: ⚠️  FUNCIONAL (Sin verificación SSL)")
-        print(f"      └── Certificado: {prod_cert} (usando certificado de PROD)")
-        print(f"      └── Verificación SSL: Deshabilitada")
-        print(f"      └── Nota: Para habilitar SSL en TEST, obtenga el certificado real")
-
-def get_masked_input(prompt):
+    print(f"   🏭 PROD: ✅ FUNCIONAL")
+    print(f"      └── URL: {env_configs['prod']['url']}")
+    print(f"      └── Verificación SSL: Habilitada")
+    print(f"      └── Certificados: Gestionados desde .env ({cert_dir})")
+    
+    print(f"   🧪 TEST: ⚠️  FUNCIONAL")
+    print(f"      └── URL: {env_configs['test']['url']}")
+    print(f"      └── Verificación SSL: Deshabilitada")
+    print(f"      └── Certificados: Gestionados desde .env ({cert_dir})")
+    
+    print(f"\n💡 Configuración de certificados centralizada en .env:")
+    print(f"   📂 SSL_CERT_DIR={cert_dir}")
+    print(f"   🔍 SSL_CERT_AUTO_DETECT={os.environ.get('SSL_CERT_AUTO_DETECT', 'true')}")def get_masked_input(prompt):
     """Lee la entrada del usuario mostrando asteriscos. Compatible con Windows y Linux."""
     import sys
     import platform

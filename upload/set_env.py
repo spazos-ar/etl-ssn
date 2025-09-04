@@ -2,76 +2,45 @@ import sys
 import json
 import os
 import shutil
-import glob
+from pathlib import Path
+from dotenv import load_dotenv
+from lib.cert_utils import cert_manager
+
+# Cargar variables de entorno
+env_path = Path(__file__).resolve().parents[1] / '.env'
+load_dotenv(dotenv_path=env_path)
 
 CONFIG_FILES = [
     os.path.join(os.path.dirname(__file__), 'config-mensual.json'),
     os.path.join(os.path.dirname(__file__), 'config-semanal.json'),
 ]
 
-def get_latest_cert_file(environment):
-    """Busca el certificado más reciente para el ambiente especificado."""
-    script_dir = os.path.dirname(__file__)
-    cert_dir = os.path.join(script_dir, 'certs')
-    
-    if environment == 'test':
-        pattern = os.path.join(cert_dir, 'ssn_cert_test_*.pem')
-    else:
-        pattern = os.path.join(cert_dir, 'ssn_cert_*.pem')
-    
-    cert_files = glob.glob(pattern)
-    if cert_files:
-        # Filtrar archivos de test para ambiente prod
-        if environment == 'prod':
-            cert_files = [f for f in cert_files if 'test' not in os.path.basename(f)]
-        
-        if cert_files:
-            # Retornar el más reciente basado en el nombre (fecha)
-            latest_cert = sorted(cert_files)[-1]
-            return os.path.relpath(latest_cert, script_dir).replace('\\', '/')
-    
-    # Fallback a valores por defecto si no se encuentra
-    if environment == 'test':
-        return 'certs/ssn_cert_test_20250903.pem'
-    else:
-        return 'certs/ssn_cert_20250903.pem'
-
-# Configuración base de ambientes (sin certificados hardcodeados)
-ENVIRONMENTS = {
-    'prod': {
-        'url': 'https://ri.ssn.gob.ar/api',
-        'ssl_verify': True
-    },
-    'test': {
-        'url': 'https://testri.ssn.gob.ar/api',
-        'ssl_verify': False
-    }
-}
+CONFIG_FILES = [
+    os.path.join(os.path.dirname(__file__), 'config-mensual.json'),
+    os.path.join(os.path.dirname(__file__), 'config-semanal.json'),
+]
 
 def set_environment(env):
     """Cambia el ambiente activo actualizando las configuraciones."""
-    if env not in ENVIRONMENTS:
-        print(f"❌ Ambiente inválido: {env}. Use 'prod' o 'test'.")
+    print(f"🔧 Configurando ambiente: {env.upper()}")
+    
+    # Obtener configuración del ambiente usando el gestor de certificados
+    config = cert_manager.get_environment_config(env)
+    
+    if not config['cert_path']:
+        print(f"❌ Error: No se encontró certificado para el ambiente {env}")
+        print(f"💡 Verifique que existan certificados en el directorio: {cert_manager.cert_dir}")
         sys.exit(1)
     
-    env_config = ENVIRONMENTS[env]
-    url = env_config['url']
-    ssl_verify = env_config['ssl_verify']
-    
-    # Buscar el certificado más reciente dinámicamente
-    cert_file = get_latest_cert_file(env)
-    
-    # Verificar que el certificado exista
-    script_dir = os.path.dirname(__file__)
-    cert_path = os.path.join(script_dir, cert_file)
-    if not os.path.isfile(cert_path):
-        print(f"❌ Error: No se encuentra el certificado para el ambiente {env}: {cert_path}")
+    if not config['cert_exists']:
+        cert_full_path = cert_manager.get_full_cert_path(config['cert_path'])
+        print(f"❌ Error: No se encuentra el certificado para el ambiente {env}: {cert_full_path}")
         print(f"💡 Asegúrese de que el certificado esté disponible antes de cambiar al ambiente {env}")
         sys.exit(1)
     
-    print(f"🔧 Configurando ambiente: {env.upper()}")
-    print(f"🌐 URL del servicio: {url}")
-    print(f"🔒 Certificado: {cert_file}")
+    print(f"🌐 URL del servicio: {config['url']}")
+    print(f"🔒 Certificado: {config['cert_path']}")
+    print(f"🛡️ Verificación SSL: {'Activada' if config['ssl_verify'] else 'Desactivada'}")
     
     updated_count = 0
     for config_path in CONFIG_FILES:
@@ -83,11 +52,10 @@ def set_environment(env):
             with open(config_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # Actualizar configuración
+            # Actualizar configuración (sin certificados)
             data['environment'] = env
-            data['baseUrl'] = url
-            data['ssl']['cafile'] = cert_file
-            data['ssl']['verify'] = ssl_verify
+            data['baseUrl'] = config['url']
+            data['ssl']['verify'] = config['ssl_verify']
             
             with open(config_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
@@ -103,12 +71,27 @@ def set_environment(env):
     if updated_count > 0:
         print(f"🎯 Ambiente cambiado exitosamente a {env.upper()}")
         print(f"📋 Se actualizaron {updated_count} archivo(s) de configuración")
+        
+        # Mostrar información adicional sobre los certificados disponibles
+        available_certs = cert_manager.list_available_certs()
+        if len(available_certs) > 1:
+            print(f"📜 Certificados disponibles en {cert_manager.cert_dir}:")
+            for cert_file in available_certs:
+                cert_name = os.path.basename(cert_file)
+                is_current = cert_name in config['cert_path']
+                status = "🟢 ACTIVO" if is_current else "📄"
+                print(f"   {status} {cert_name}")
     else:
         print("⚠️  No se pudo actualizar ningún archivo de configuración")
         sys.exit(1)
-
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         print("Uso: python set_env.py [prod|test]")
         sys.exit(1)
-    set_environment(sys.argv[1])
+    
+    env = sys.argv[1].lower()
+    if env not in ['prod', 'test']:
+        print(f"❌ Ambiente inválido: {env}. Use 'prod' o 'test'.")
+        sys.exit(1)
+    
+    set_environment(env)
