@@ -273,7 +273,9 @@ def update_config_multi_env(certificates):
     
     print(f"\n💡 Configuración de certificados centralizada en .env:")
     print(f"   📂 SSL_CERT_DIR={cert_dir}")
-    print(f"   🔍 SSL_CERT_AUTO_DETECT={os.environ.get('SSL_CERT_AUTO_DETECT', 'true')}")def get_masked_input(prompt):
+    print(f"   🔍 SSL_CERT_AUTO_DETECT={os.environ.get('SSL_CERT_AUTO_DETECT', 'true')}")
+
+def get_masked_input(prompt):
     """Lee la entrada del usuario mostrando asteriscos. Compatible con Windows y Linux."""
     import sys
     import platform
