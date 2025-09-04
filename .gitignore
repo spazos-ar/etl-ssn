@@ -61,7 +61,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/  # Comentado para permitir upload/lib/
 lib64/
 parts/
 sdist/
@@ -86,7 +86,7 @@ bin/  # virtualenv en Unix
 include/  # virtualenv en Unix
 lib64/  # virtualenv en Unix
 Scripts/  # virtualenv en Windows
-Lib/  # virtualenv en Windows
+Lib/  # virtualenv en Windows (solo en raíz)
 tcl/  # virtualenv en Windows
 
 # Testing y cobertura
