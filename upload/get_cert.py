@@ -26,7 +26,7 @@ SERVERS = {
     'test': 'testri.ssn.gob.ar'
 }
 
-def get_server_certificate(hostname, port=443, environment='prod'):
+def get_server_certificate(hostname, port=443, environment='prod', timeout=30):
     logging.basicConfig(level=logging.INFO, format='%(message)s')
     logger = logging.getLogger(__name__)
     
@@ -37,10 +37,12 @@ def get_server_certificate(hostname, port=443, environment='prod'):
         context.verify_mode = ssl.CERT_NONE
         
         logger.info(f"🌐 Conectando a {hostname}:{port} (ambiente: {environment.upper()})...")
+        logger.info(f"⏱️ Timeout configurado: {timeout} segundos")
         
-        with socket.create_connection((hostname, port)) as sock:
+        with socket.create_connection((hostname, port), timeout=timeout) as sock:
+            logger.info("🔗 Conexión TCP establecida, iniciando handshake SSL...")
             with context.wrap_socket(sock, server_hostname=hostname) as ssock:
-                logger.debug("Conexión SSL establecida")
+                logger.info("✅ Conexión SSL establecida exitosamente")
                 
                 # Obtener certificado en formato PEM
                 cert = ssl.DER_cert_to_PEM_cert(ssock.getpeercert(binary_form=True))
@@ -97,7 +99,7 @@ def get_certificates_for_all_environments():
     for env, hostname in SERVERS.items():
         try:
             print(f"\n🔒 Obteniendo certificado para ambiente {env.upper()}...")
-            cert_file = get_server_certificate(hostname, environment=env)
+            cert_file = get_server_certificate(hostname, environment=env, timeout=15)
             certificates[env] = cert_file
             print(f"✅ Certificado {env.upper()} obtenido correctamente")
         except (ConnectionResetError, OSError) as e:
@@ -123,7 +125,7 @@ if __name__ == "__main__":
             get_certificates_for_all_environments()
         else:
             hostname = SERVERS[args.env]
-            get_server_certificate(hostname, environment=args.env)
+            get_server_certificate(hostname, environment=args.env, timeout=15)
     except KeyboardInterrupt:
         print("\n⚠️ Operación cancelada por el usuario")
         sys.exit(1)

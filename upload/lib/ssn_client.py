@@ -123,8 +123,7 @@ class SSNClient:
                     self.logger.debug(f"✅ Modo de verificación: CERT_REQUIRED")
                     self.logger.debug(f"🌐 Verificación de hostname: Activada")
                 elif not SSNClient._ssl_messages_shown:
-                    print("� Certificados de seguridad SSN cargados correctamente")
-                    print("�🔒 Configurando conexión segura SSL/TLS...")
+                    print("🔒 Configurando conexión segura SSL/TLS...")
                 
                 # Hacemos una prueba de conexión
                 test_client = httpx.Client(

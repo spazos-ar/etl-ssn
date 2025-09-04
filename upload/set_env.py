@@ -2,21 +2,48 @@ import sys
 import json
 import os
 import shutil
+import glob
 
 CONFIG_FILES = [
     os.path.join(os.path.dirname(__file__), 'config-mensual.json'),
     os.path.join(os.path.dirname(__file__), 'config-semanal.json'),
 ]
 
+def get_latest_cert_file(environment):
+    """Busca el certificado más reciente para el ambiente especificado."""
+    script_dir = os.path.dirname(__file__)
+    cert_dir = os.path.join(script_dir, 'certs')
+    
+    if environment == 'test':
+        pattern = os.path.join(cert_dir, 'ssn_cert_test_*.pem')
+    else:
+        pattern = os.path.join(cert_dir, 'ssn_cert_*.pem')
+    
+    cert_files = glob.glob(pattern)
+    if cert_files:
+        # Filtrar archivos de test para ambiente prod
+        if environment == 'prod':
+            cert_files = [f for f in cert_files if 'test' not in os.path.basename(f)]
+        
+        if cert_files:
+            # Retornar el más reciente basado en el nombre (fecha)
+            latest_cert = sorted(cert_files)[-1]
+            return os.path.relpath(latest_cert, script_dir).replace('\\', '/')
+    
+    # Fallback a valores por defecto si no se encuentra
+    if environment == 'test':
+        return 'certs/ssn_cert_test_20250903.pem'
+    else:
+        return 'certs/ssn_cert_20250903.pem'
+
+# Configuración base de ambientes (sin certificados hardcodeados)
 ENVIRONMENTS = {
     'prod': {
         'url': 'https://ri.ssn.gob.ar/api',
-        'cert': 'certs/ssn_cert_20250903.pem',
         'ssl_verify': True
     },
     'test': {
         'url': 'https://testri.ssn.gob.ar/api',
-        'cert': 'certs/ssn_cert_test_20250903.pem',
         'ssl_verify': False
     }
 }
@@ -29,8 +56,10 @@ def set_environment(env):
     
     env_config = ENVIRONMENTS[env]
     url = env_config['url']
-    cert_file = env_config['cert']
     ssl_verify = env_config['ssl_verify']
+    
+    # Buscar el certificado más reciente dinámicamente
+    cert_file = get_latest_cert_file(env)
     
     # Verificar que el certificado exista
     script_dir = os.path.dirname(__file__)
