@@ -6,6 +6,15 @@ from pathlib import Path
 from dotenv import load_dotenv
 from lib.cert_utils import cert_manager
 
+# Configurar la codificación para evitar problemas con emojis en Windows
+if os.name == 'nt':  # Windows
+    try:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    except:
+        pass
+
 # Cargar variables de entorno
 env_path = Path(__file__).resolve().parents[1] / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -24,22 +33,41 @@ def set_environment(env):
     """Cambia el ambiente activo actualizando las configuraciones."""
     print(f"🔧 Configurando ambiente: {env.upper()}")
     
-    # Obtener configuración del ambiente usando el gestor de certificados
-    config = cert_manager.get_environment_config(env)
+    # Definir configuraciones por ambiente
+    env_configs = {
+        'prod': {
+            'url': 'https://ri.ssn.gob.ar/api',
+            'ssl_verify': True
+        },
+        'test': {
+            'url': 'https://testri.ssn.gob.ar/api', 
+            'ssl_verify': False
+        }
+    }
     
-    if not config['cert_path']:
-        print(f"❌ Error: No se encontró certificado para el ambiente {env}")
-        print(f"💡 Verifique que existan certificados en el directorio: {cert_manager.cert_dir}")
+    if env not in env_configs:
+        print(f"❌ Error: Ambiente inválido '{env}'. Use 'prod' o 'test'.")
         sys.exit(1)
     
-    if not config['cert_exists']:
-        cert_full_path = cert_manager.get_full_cert_path(config['cert_path'])
-        print(f"❌ Error: No se encuentra el certificado para el ambiente {env}: {cert_full_path}")
-        print(f"💡 Asegúrese de que el certificado esté disponible antes de cambiar al ambiente {env}")
-        sys.exit(1)
+    config = env_configs[env]
+    
+    # Intentar obtener el certificado más reciente para el ambiente
+    cert_filename = cert_manager.get_latest_cert_for_environment(env)
+    cert_path = None
+    cert_exists = False
+    
+    if cert_filename:
+        cert_path = cert_manager.get_full_cert_path(cert_filename)
+        cert_exists = cert_manager.validate_cert_file(cert_path)
+        
+        if cert_exists:
+            print(f"🔒 Certificado encontrado: {cert_filename}")
+        else:
+            print(f"⚠️  Certificado encontrado pero no válido: {cert_filename}")
+    else:
+        print(f"⚠️  No se encontró certificado específico para el ambiente {env}")
     
     print(f"🌐 URL del servicio: {config['url']}")
-    print(f"🔒 Certificado: {config['cert_path']}")
     print(f"🛡️ Verificación SSL: {'Activada' if config['ssl_verify'] else 'Desactivada'}")
     
     updated_count = 0
@@ -52,7 +80,7 @@ def set_environment(env):
             with open(config_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # Actualizar configuración (sin certificados)
+            # Actualizar configuración (sin certificados - manejados desde .env)
             data['environment'] = env
             data['baseUrl'] = config['url']
             data['ssl']['verify'] = config['ssl_verify']
@@ -75,10 +103,11 @@ def set_environment(env):
         # Mostrar información adicional sobre los certificados disponibles
         available_certs = cert_manager.list_available_certs()
         if len(available_certs) > 1:
-            print(f"📜 Certificados disponibles en {cert_manager.cert_dir}:")
+            cert_dir = cert_manager.get_cert_directory()
+            print(f"📜 Certificados disponibles en {cert_dir}:")
             for cert_info in available_certs:
                 cert_name = cert_info['filename']
-                is_current = cert_name in config['cert_path']
+                is_current = cert_filename and cert_name == cert_filename
                 status = "🟢 ACTIVO" if is_current else "📄"
                 env_label = cert_info['environment'].upper()
                 print(f"   {status} {cert_name} ({env_label})")

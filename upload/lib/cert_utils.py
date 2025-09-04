@@ -182,6 +182,28 @@ class CertificateManager:
             self.logger.error(f"Error obteniendo información del certificado: {e}")
         
         return info
+    
+    def list_available_certs(self) -> List[dict]:
+        """Lista todos los certificados disponibles con información básica."""
+        cert_files = self.find_cert_files()
+        certs_info = []
+        
+        for cert_file in cert_files:
+            # Determinar ambiente basado en el nombre del archivo
+            filename = cert_file.name.lower()
+            environment = 'test' if 'test' in filename else 'prod'
+            
+            cert_info = {
+                'filename': cert_file.name,
+                'path': str(cert_file),
+                'environment': environment,
+                'date': self.parse_cert_date(cert_file.name),
+                'exists': cert_file.exists(),
+                'size': cert_file.stat().st_size if cert_file.exists() else 0
+            }
+            certs_info.append(cert_info)
+        
+        return certs_info
 
 # Instancia global del gestor de certificados
 cert_manager = CertificateManager()

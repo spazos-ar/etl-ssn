@@ -433,15 +433,21 @@ def verify_setup():
         return False
     
     try:
-        # Verificar conexión SSL básica (sin cambiar de directorio)
+        # Verificar conexión SSL básica ejecutando directamente el script
         result = subprocess.run(
             [python_path, '-c', """
-import os, sys
+import os, sys, importlib.util
 sys.path.insert(0, 'upload')
 os.chdir('upload')
-from ssn_mensual import test_ssl_connection, load_config
-config = load_config('config-mensual.json')
-test_ssl_connection(config)
+
+# Importar ssn-mensual.py usando importlib
+spec = importlib.util.spec_from_file_location("ssn_mensual", "ssn-mensual.py")
+ssn_mensual = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ssn_mensual)
+
+# Ejecutar verificación SSL
+config = ssn_mensual.load_config('config-mensual.json')
+ssn_mensual.test_ssl_connection(config)
 """],
             capture_output=True,
             text=True,
@@ -472,13 +478,18 @@ test_ssl_connection(config)
             # Intentar hacer login básico sin consultas complejas
             auth_result = subprocess.run(
                 [python_path, '-c', """
-import os, sys
+import os, sys, importlib.util
 sys.path.insert(0, 'upload')
 os.chdir('upload')
-from ssn_mensual import load_config, authenticate
-config = load_config('config-mensual.json')
+
+# Importar ssn-mensual.py usando importlib
+spec = importlib.util.spec_from_file_location("ssn_mensual", "ssn-mensual.py")
+ssn_mensual = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ssn_mensual)
+
 try:
-    token = authenticate(config)
+    config = ssn_mensual.load_config('config-mensual.json')
+    token = ssn_mensual.authenticate(config)
     if token:
         print('✅ Autenticación exitosa')
     else:
@@ -520,7 +531,7 @@ except Exception as e:
         print(f"✗ Error en la verificación: {e}")
         return False
 
-def main():
+def main(skip_deps=False):
     """Función principal de configuración."""
     print("""
 🔧 === Configuración inicial del proyecto ETL-SSN === 🔧
@@ -543,10 +554,14 @@ Este asistente lo guiará en la configuración inicial del sistema:
         print("✅ Entorno virtual ya existe y está listo para usar")
     
     try:
-        print("\n📦 === Paso 2: Instalación de dependencias ===")
-        # Instalar dependencias
-        install_requirements()
-        print("✅ Todas las dependencias han sido instaladas correctamente")
+        if not skip_deps:
+            print("\n📦 === Paso 2: Instalación de dependencias ===")
+            # Instalar dependencias
+            install_requirements()
+            print("✅ Todas las dependencias han sido instaladas correctamente")
+        else:
+            print("\n📦 === Paso 2: Instalación de dependencias ===")
+            print("⏭️ Omitiendo instalación de dependencias (ya fueron instaladas)")
         
         print("\n🔑 === Paso 3: Configuración de credenciales ===")
         # Configurar archivo .env
@@ -577,13 +592,6 @@ Este asistente lo guiará en la configuración inicial del sistema:
             print("\n💡 Nota importante sobre certificados:")
             print("  🔒 El certificado obtenido es válido para el ambiente de PRODUCCIÓN")
             print("  🧪 Para usar el ambiente de TEST, deberá obtener el certificado correspondiente")
-            print("      y reemplazar el archivo: upload/certs/ssn_cert_test_20250903.pem")
-            print("\n🔧 Para usar Python con las dependencias instaladas, use:")
-            print("  1. Para cambiar política de PowerShell (recomendado):")
-            print("     🏃▶️ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser")
-            print("     🏃▶️ Luego: .\\.venv\\Scripts\\Activate")
-            print("  2. O ejecute directamente con Python del entorno virtual:")
-            print("     🏃▶️ .\\.venv\\Scripts\\python.exe <script>")
             
             # Asegurar que quede configurado en ambiente de producción
             print("\n🎯 Configurando ambiente por defecto (PRODUCCIÓN)...")
@@ -614,13 +622,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Script de configuración ETL-SSN')
     parser.add_argument('--use-venv', action='store_true', 
                        help='Indica que ya se está ejecutando desde el entorno virtual')
+    parser.add_argument('--skip-deps', action='store_true',
+                       help='Omitir la instalación de dependencias (ya fueron instaladas)')
     args = parser.parse_args()
     
     # Si no estamos usando el entorno virtual, hacer configuración inicial y luego re-ejecutar
     if not args.use_venv:
-        print("🔧 === Configuración inicial del proyecto ETL-SSN === 🔧")
-        print("🐍 Configurando entorno virtual...")
-        
         # Paso 1: Crear entorno virtual
         if create_venv():
             print("✅ Entorno virtual creado correctamente")
@@ -628,7 +635,6 @@ if __name__ == "__main__":
             print("✅ Entorno virtual ya existe")
         
         # Paso 2: Instalar dependencias
-        print("📦 Instalando dependencias...")
         try:
             install_requirements()
             print("✅ Dependencias instaladas correctamente")
@@ -637,12 +643,11 @@ if __name__ == "__main__":
             sys.exit(1)
         
         # Re-ejecutar el script en el entorno virtual para la configuración completa
+        # NOTA: Pasamos --skip-deps para evitar reinstalar las dependencias
         venv_python = Path('.venv/Scripts/python.exe' if platform.system() == "Windows" else '.venv/bin/python')
         if venv_python.exists():
-            print("🔄 Re-ejecutando script con el entorno virtual para configuración completa...")
             try:
-                subprocess.check_call([str(venv_python), __file__, '--use-venv'])
-                print("✅ Configuración completada exitosamente")
+                subprocess.check_call([str(venv_python), __file__, '--use-venv', '--skip-deps'])
             except subprocess.CalledProcessError as e:
                 print(f"❌ Error durante la configuración: {e}")
                 sys.exit(e.returncode)
@@ -651,4 +656,4 @@ if __name__ == "__main__":
             sys.exit(1)
     else:
         # Ejecutar configuración completa desde dentro del entorno virtual
-        main()
+        main(skip_deps=args.skip_deps)
