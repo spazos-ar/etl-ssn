@@ -47,6 +47,7 @@ Fecha: Septiembre 2025
 """
 
 import os
+import os
 import json
 import httpx
 import certifi
