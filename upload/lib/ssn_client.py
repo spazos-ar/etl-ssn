@@ -47,6 +47,7 @@ Fecha: Septiembre 2025
 """
 
 import os
+import os
 import json
 import httpx
 import certifi
@@ -94,18 +95,28 @@ class SSNClient:
                 # Cargar certificados de certifi
                 ssl_context.load_verify_locations(cafile=certifi.where())
                 
-                # Cargar certificado específico de la SSN si está configurado
-                if 'cafile' in self.config.get('ssl', {}):
-                    ca_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 
-                                         self.config['ssl']['cafile'])
-                    if os.path.exists(ca_file):
-                        ssl_context.load_verify_locations(cafile=ca_file)
-                        if not self.debug and not SSNClient._ssl_messages_shown:
-                            print("🔐 Certificados de seguridad SSN cargados correctamente")
-                        elif self.debug:
-                            self.logger.info(f"Cargado certificado específico: {ca_file}")
+                # Cargar certificado específico de la SSN desde .env
+                try:
+                    from .cert_utils import cert_manager
+                    current_env = self.config.get('environment', 'prod')
+                    cert_path = cert_manager.get_latest_cert_for_environment(current_env)
+                    
+                    if cert_path:
+                        ca_file_full = cert_manager.get_full_cert_path(cert_path)
+                        if os.path.exists(ca_file_full):
+                            ssl_context.load_verify_locations(cafile=ca_file_full)
+                            if not self.debug and not SSNClient._ssl_messages_shown:
+                                print("🔐 Certificados de seguridad SSN cargados correctamente")
+                            elif self.debug:
+                                self.logger.info(f"Cargado certificado específico: {ca_file_full}")
+                        else:
+                            self.logger.warning(f"No se encontró el archivo de certificado: {ca_file_full}")
                     else:
-                        self.logger.warning(f"No se encontró el archivo de certificado: {ca_file}")
+                        self.logger.warning("No se pudo obtener ruta del certificado desde configuración .env")
+                except ImportError:
+                    self.logger.warning("cert_utils no disponible, usando solo certificados del sistema")
+                except Exception as e:
+                    self.logger.warning(f"Error cargando certificado desde .env: {e}")
                 
                 # Configurar nivel de seguridad para producción
                 ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -123,8 +134,7 @@ class SSNClient:
                     self.logger.debug(f"✅ Modo de verificación: CERT_REQUIRED")
                     self.logger.debug(f"🌐 Verificación de hostname: Activada")
                 elif not SSNClient._ssl_messages_shown:
-                    print("� Certificados de seguridad SSN cargados correctamente")
-                    print("�🔒 Configurando conexión segura SSL/TLS...")
+                    print("🔒 Configurando conexión segura SSL/TLS...")
                 
                 # Hacemos una prueba de conexión
                 test_client = httpx.Client(

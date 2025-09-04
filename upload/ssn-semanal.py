@@ -50,6 +50,7 @@ import argparse
 import shutil
 import platform
 from dotenv import load_dotenv
+from datetime import datetime
 
 def show_error_message(error_message):
     """Muestra un mensaje de error destacado y bien formateado."""
@@ -202,7 +203,7 @@ def show_startup_banner(config):
     print(f"🏢 Tipo de entrega: SEMANAL")
     print(f"🌐 Ambiente: {env}")
     print(f"🔗 Servidor: {base_url}")
-    print(f"📅 Fecha: {os.environ.get('DATE', 'No disponible')}")
+    print(f"📅 Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
     print("-" * 60)
 
 def setup_logging(debug_mode):

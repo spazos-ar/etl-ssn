@@ -73,6 +73,7 @@ import shutil
 from dotenv import load_dotenv
 from pathlib import Path
 import re
+from datetime import datetime
 from lib.ssn_client import SSNClient  # TODO: Actualizar a ssn-client en v2.0
 
 def show_error_message(error_message):
@@ -167,7 +168,7 @@ def show_startup_banner(config):
     print(f"🏢 Tipo de entrega: MENSUAL")
     print(f"🌐 Ambiente: {env}")
     print(f"🔗 Servidor: {base_url}")
-    print(f"📅 Fecha: {os.environ.get('DATE', 'No disponible')}")
+    print(f"📅 Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
     print("-" * 60)
 
 def authenticate(config):
