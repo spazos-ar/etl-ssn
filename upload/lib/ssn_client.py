@@ -264,12 +264,21 @@ class SSNClient:
                     error_parts.append(data["message"])
                 
                 # Agregar errores específicos si existen
-                if data.get("errors"):
-                    if isinstance(data["errors"], list):
-                        for error in data["errors"]:
+                # Buscar tanto "errors" (inglés) como "errores" (español)
+                # Solo considerar campos que sean arrays o strings, no objetos complejos
+                errores = None
+                for field in ["errors", "errores"]:
+                    field_value = data.get(field)
+                    if field_value and (isinstance(field_value, (list, str))):
+                        errores = field_value
+                        break
+                
+                if errores:
+                    if isinstance(errores, list):
+                        for error in errores:
                             error_parts.append(f"  • {error}")
                     else:
-                        error_parts.append(f"  • {data['errors']}")
+                        error_parts.append(f"  • {errores}")
                 
                 # Si no hay mensaje estructurado, usar campos alternativos
                 if not error_parts:

@@ -78,7 +78,7 @@ from lib.ssn_client import SSNClient  # TODO: Actualizar a ssn-client en v2.0
 def show_error_message(error_message):
     """Muestra un mensaje de error destacado y bien formateado."""
     print("\n" + "="*80)
-    print("|| ERROR:")
+    print("|| ⛔ ERROR:")
     print("||")
     # Dividir el mensaje en líneas para ajustar al ancho
     for line in error_message.split('\n'):
